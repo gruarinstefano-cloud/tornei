@@ -2,8 +2,8 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import type { Torneo, Squadra, Partita, Campo, Sponsor } from '@/lib/types'
-import { calcolaClassifica } from '@/lib/types'
+import type { Torneo, Squadra, Partita, Campo, Sponsor, Giornata, SlotCampo, CalendarioItem, Pausa } from '@/lib/types'
+import { calcolaClassifica, calcolaOrariSlot, formatOra, formatDataBreve } from '@/lib/types'
 import LogoSquadra from '@/components/LogoSquadra'
 import BannerTorneo from '@/components/BannerTorneo'
 import Link from 'next/link'
@@ -17,6 +17,8 @@ export default function TorneoPage() {
   const [partite, setPartite] = useState<Partita[]>([])
   const [campi, setCampi] = useState<Campo[]>([])
   const [sponsor, setSponsor] = useState<Sponsor[]>([])
+  const [giornate, setGiornate] = useState<Giornata[]>([])
+  const [pause, setPause] = useState<Pausa[]>([])
   const [tab, setTab] = useState<Tab>('gironi')
   const [loading, setLoading] = useState(true)
 
@@ -31,11 +33,15 @@ export default function TorneoPage() {
           sb.from('partite').select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)').eq('torneo_id', t.id).order('data_ora', { ascending: true, nullsFirst: false }),
           sb.from('campi').select('*').eq('torneo_id', t.id).order('ordine'),
           sb.from('sponsor').select('*').eq('torneo_id', t.id).order('ordine'),
+          sb.from('giornate').select('*, slot:slot_campo(*)').eq('torneo_id', t.id).order('data'),
+          sb.from('pause').select('*').eq('torneo_id', t.id).order('ordine_calendario'),
         ])
         setSquadre(sq.data ?? [])
         setPartite((pa.data ?? []) as Partita[])
         setCampi(ca.data ?? [])
         setSponsor(sp.data ?? [])
+        setGiornate((gn as any).data ?? [])
+        setPause((pu as any).data ?? [])
         setLoading(false)
       })
   }, [slug])
@@ -148,46 +154,96 @@ export default function TorneoPage() {
 
         {/* PROGRAMMA */}
         {tab === 'programma' && (
-          <div className="grid gap-5 md:grid-cols-2">
-            {campi.map(c => {
-              const pCampo = partite.filter(p => p.campo_id === c.id)
+          <div className="space-y-6">
+            {giornate.length === 0 && campi.length === 0 && (
+              <div className="text-center py-12 text-gray-400">Nessun programma configurato</div>
+            )}
+            {(giornate.length > 0 ? giornate : [null]).map(giornata => {
+              const gId = giornata?.id ?? null
               return (
-                <div key={c.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-                  <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100">
-                    <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: c.colore }}/>
-                    <span className="font-medium text-sm text-gray-800">{c.nome}</span>
-                    <span className="ml-auto text-xs text-gray-400">{pCampo.length} partite</span>
+                <div key={giornata?.id ?? 'no-date'}>
+                  {giornata && (
+                    <h3 className="text-sm font-semibold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                      <span className="w-2 h-2 rounded-full bg-gray-300 inline-block"/>
+                      {formatDataBreve(giornata.data)}
+                    </h3>
+                  )}
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {campi.map(campo => {
+                      const itemsPartite = partite
+                        .filter(p => p.campo_id === campo.id && (!gId || p.giornata_id === gId))
+                        .sort((a,b) => a.ordine_calendario - b.ordine_calendario)
+                        .map(p => ({ kind: 'partita' as const, data: p }))
+                      const itemsPause = pause
+                        .filter(p => p.campo_id === campo.id && (!gId || p.giornata_id === gId))
+                        .sort((a,b) => a.ordine_calendario - b.ordine_calendario)
+                        .map(p => ({ kind: 'pausa' as const, data: p }))
+                      const allItems: CalendarioItem[] = [...itemsPartite, ...itemsPause]
+                        .sort((a,b) => a.data.ordine_calendario - b.data.ordine_calendario)
+                      const slotOrario = giornata?.slot?.find(s => s.campo_id === campo.id)?.orario_inizio ?? '09:00'
+                      const orariMap = giornata
+                        ? calcolaOrariSlot(allItems, giornata.data, slotOrario,
+                            (torneo as any).durata_partita_minuti ?? 20,
+                            (torneo as any).durata_partita_eliminazione_minuti ?? 20,
+                            (torneo as any).tempo_tecnico_minuti ?? 5)
+                        : new Map<string, Date>()
+                      if (allItems.length === 0) return null
+                      return (
+                        <div key={campo.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                          <div className="px-4 py-3 flex items-center gap-2 border-b border-gray-100">
+                            <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: campo.colore }}/>
+                            <span className="font-medium text-sm text-gray-800">{campo.nome}</span>
+                          </div>
+                          {allItems.map(item => {
+                            if (item.kind === 'pausa') {
+                              if (item.data.tipo === 'separatore') return (
+                                <div key={item.data.id} className="flex items-center gap-2 px-4 py-1.5">
+                                  <div className="flex-1 border-t border-dashed border-gray-200"/>
+                                  <span className="text-xs text-gray-400">{item.data.etichetta}</span>
+                                  <div className="flex-1 border-t border-dashed border-gray-200"/>
+                                </div>
+                              )
+                              return (
+                                <div key={item.data.id} className="px-4 py-2" style={{ background: item.data.colore+'15' }}>
+                                  <span className="text-xs font-medium text-amber-700">{item.data.etichetta} — {item.data.durata_minuti} min</span>
+                                </div>
+                              )
+                            }
+                            const p = item.data
+                            const orario = orariMap.get(p.id)
+                            return (
+                              <div key={p.id} className="px-4 py-3 border-b border-gray-50 last:border-0">
+                                <div className="flex items-center gap-2 mb-1">
+                                  {orario && <span className="text-xs font-mono font-semibold text-blue-600">{formatOra(orario)}</span>}
+                                  {p.giocata && <span className="text-xs text-green-600">✓</span>}
+                                  {p.girone && <span className="text-xs text-gray-400">Girone {p.girone}</span>}
+                                  {p.fase !== 'girone' && p.fase !== 'campionato' && (
+                                    <span className="text-xs text-purple-500 capitalize">{p.fase}</span>
+                                  )}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                  <div className="flex items-center gap-1.5 flex-1 justify-end">
+                                    <span className="text-sm font-medium truncate">{p.squadra_casa?.nome}</span>
+                                    <LogoSquadra squadra={p.squadra_casa!} size={20}/>
+                                  </div>
+                                  <span className="px-2 py-0.5 bg-gray-100 rounded font-bold text-xs min-w-[44px] text-center">
+                                    {p.giocata ? `${p.gol_casa}–${p.gol_ospite}` : 'vs'}
+                                  </span>
+                                  <div className="flex items-center gap-1.5 flex-1">
+                                    <LogoSquadra squadra={p.squadra_ospite!} size={20}/>
+                                    <span className="text-sm font-medium truncate">{p.squadra_ospite?.nome}</span>
+                                  </div>
+                                </div>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )
+                    })}
                   </div>
-                  {pCampo.length === 0
-                    ? <div className="px-4 py-4 text-sm text-gray-400">Nessuna partita assegnata</div>
-                    : pCampo.map(p => (
-                      <div key={p.id} className="px-4 py-3 border-b border-gray-50 last:border-0">
-                        <div className="text-xs text-gray-400 mb-1.5">
-                          {p.giocata ? '✓ Giocata' : p.data_ora
-                            ? new Date(p.data_ora).toLocaleTimeString('it-IT', { hour: '2-digit', minute: '2-digit' })
-                            : 'Orario da definire'}
-                          {p.girone && <span className="ml-2 text-gray-300">Girone {p.girone}</span>}
-                        </div>
-                        <div className="flex items-center gap-2">
-                          <div className="flex items-center gap-1.5 flex-1 justify-end">
-                            <span className="text-sm font-medium truncate">{p.squadra_casa?.nome}</span>
-                            <LogoSquadra squadra={p.squadra_casa!} size={20}/>
-                          </div>
-                          <span className="px-2 py-0.5 bg-gray-100 rounded font-bold text-xs min-w-[44px] text-center">
-                            {p.giocata ? `${p.gol_casa}–${p.gol_ospite}` : 'vs'}
-                          </span>
-                          <div className="flex items-center gap-1.5 flex-1">
-                            <LogoSquadra squadra={p.squadra_ospite!} size={20}/>
-                            <span className="text-sm font-medium truncate">{p.squadra_ospite?.nome}</span>
-                          </div>
-                        </div>
-                      </div>
-                    ))
-                  }
                 </div>
               )
             })}
-            {campi.length === 0 && <div className="col-span-2 text-center py-12 text-gray-400">Nessun campo configurato</div>}
           </div>
         )}
 
@@ -214,7 +270,7 @@ export default function TorneoPage() {
                               { sq: p.squadra_casa, gol: p.gol_casa, win: p.giocata && (p.gol_casa??0)>(p.gol_ospite??0) },
                               { sq: p.squadra_ospite, gol: p.gol_ospite, win: p.giocata && (p.gol_ospite??0)>(p.gol_casa??0) }
                             ].map((row, i) => (
-                              <div key={i} className={`flex items-center gap-2 px-3 py-2.5 ${i===0?'border-b border-gray-100':''}`}
+                              <div key={i} className={`flex items-center gap-2 px-3 py-2 ${i===0?'border-b border-gray-100':''}`}
                                 style={row.win ? { background: primary+'08', fontWeight:600 } : {}}>
                                 <LogoSquadra squadra={row.sq ?? { nome:'?', logo_url:null }} size={22}/>
                                 <span className="flex-1 text-sm truncate">{row.sq?.nome ?? '–'}</span>
