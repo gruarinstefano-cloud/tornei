@@ -296,24 +296,32 @@ export default function TorneoPage() {
 
 function MatchRow({ p, primary, upcoming }: { p: Partita; primary: string; upcoming?: boolean }) {
   return (
-    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
-      <div className="flex items-center gap-1.5 flex-1 justify-end">
-        <span className="text-sm font-medium text-gray-800 truncate">{p.squadra_casa?.nome}</span>
-        <LogoSquadra squadra={p.squadra_casa!} size={24}/>
-      </div>
-      {upcoming
-        ? <span className="px-3 py-1 bg-gray-50 border border-gray-200 rounded text-sm min-w-[56px] text-center text-gray-400">vs</span>
-        : <span className="px-3 py-1 bg-gray-100 rounded font-bold text-sm min-w-[56px] text-center">{p.gol_casa}–{p.gol_ospite}</span>
-      }
-      <div className="flex items-center gap-1.5 flex-1">
-        <LogoSquadra squadra={p.squadra_ospite!} size={24}/>
-        <span className="text-sm font-medium text-gray-800 truncate">{p.squadra_ospite?.nome}</span>
-      </div>
+    <div className="border-b border-gray-50 last:border-0">
       {upcoming && p.data_ora && (
-        <span className="text-xs text-gray-400 hidden sm:block whitespace-nowrap">
+        <div className="px-4 pt-2 text-xs text-gray-400 text-center">
           {new Date(p.data_ora).toLocaleString('it-IT', { day:'2-digit', month:'short', hour:'2-digit', minute:'2-digit' })}
-        </span>
+        </div>
       )}
+      <div className="flex items-center px-3 py-3">
+        <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+          <LogoSquadra squadra={p.squadra_casa!} size={32}/>
+          <span className="text-xs font-medium text-gray-800 text-center leading-tight w-full px-1 line-clamp-2">
+            {p.squadra_casa?.nome}
+          </span>
+        </div>
+        <div className="flex-shrink-0 mx-3 text-center">
+          {upcoming
+            ? <span className="block px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-lg text-sm text-gray-400 min-w-[48px]">vs</span>
+            : <span className="block px-3 py-1.5 bg-gray-100 rounded-lg font-bold text-sm min-w-[48px]">{p.gol_casa}–{p.gol_ospite}</span>
+          }
+        </div>
+        <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+          <LogoSquadra squadra={p.squadra_ospite!} size={32}/>
+          <span className="text-xs font-medium text-gray-800 text-center leading-tight w-full px-1 line-clamp-2">
+            {p.squadra_ospite?.nome}
+          </span>
+        </div>
+      </div>
     </div>
   )
 }
