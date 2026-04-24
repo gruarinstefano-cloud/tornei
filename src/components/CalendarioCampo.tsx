@@ -63,7 +63,7 @@ export default function CalendarioCampo({ campo, giornata, slotOrario, items, du
               className={`transition-all ${dragIdx===i ? 'opacity-40' : ''} ${overIdx===i && dragIdx!==i ? 'border-t-2 border-blue-400' : ''}`}
               style={{ cursor: 'grab' }}>
               {item.kind === 'partita'
-                ? <PartitaSlot p={item.data} orario={orario}/>
+                ? <PartitaSlot p={item.data} orario={orario ?? undefined}/>
                 : <PausaSlot p={item.data} onDelete={() => onDeletePausa(item.data.id)} onUpdate={u => onUpdatePausa(item.data.id, u)}/>
               }
             </div>
