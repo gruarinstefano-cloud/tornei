@@ -635,7 +635,16 @@ function RisultatoRow({ p, onSave }: { p: Partita; onSave: (gc: number, go: numb
           <button onClick={() => onSave(gc, go)}
             className={`px-4 py-1 rounded-lg text-xs font-medium ${p.giocata ? 'bg-green-100 text-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
             {p.giocata ? '✓ Aggiorna' : 'Salva'}
-      </button>
+          </button>
+        </div>
+        {/* Squadra ospite */}
+        <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+          <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={28}/>
+          <span className="text-xs font-medium text-gray-800 text-center leading-tight w-full px-1 line-clamp-2">
+            {(p.squadra_ospite as any)?.nome ?? '–'}
+          </span>
+        </div>
+      </div>
     </div>
   )
 }
