@@ -9,7 +9,18 @@ export type Torneo = {
   colore_secondario: string
   nome_societa: string
   sponsor: string[]
+  banner_url: string | null
+  n_squadre_eliminatoria: number
   created_at: string
+}
+
+export type Sponsor = {
+  id: string
+  torneo_id: string
+  nome: string
+  logo_url: string | null
+  sito_web: string | null
+  ordine: number
 }
 
 export type Squadra = {
@@ -17,6 +28,7 @@ export type Squadra = {
   torneo_id: string
   nome: string
   girone: string | null
+  logo_url: string | null
 }
 
 export type Campo = {
@@ -77,4 +89,29 @@ export function calcolaClassifica(squadre: Squadra[], partite: Partita[], girone
     })
     return { squadra: sq, g: mine.length, v, p: par, s, gf, gs, pt: v*3+par }
   }).sort((a, b) => b.pt - a.pt || (b.gf - b.gs) - (a.gf - a.gs) || b.gf - a.gf)
+}
+
+export function generaRoundRobin(squadre: Squadra[]): [Squadra, Squadra][] {
+  const pairs: [Squadra, Squadra][] = []
+  for (let i = 0; i < squadre.length; i++)
+    for (let j = i + 1; j < squadre.length; j++)
+      pairs.push([squadre[i], squadre[j]])
+  return pairs
+}
+
+export function generaEliminatoria(
+  gironi: string[],
+  classifiche: Record<string, StatSquadra[]>,
+  nPerGirone: number
+): { casa: Squadra; ospite: Squadra; fase: Partita['fase'] }[] {
+  const qualificate: Squadra[] = []
+  for (let pos = 0; pos < nPerGirone; pos++)
+    for (const g of gironi)
+      if (classifiche[g]?.[pos]) qualificate.push(classifiche[g][pos].squadra)
+  const n = qualificate.length
+  const fase: Partita['fase'] = n >= 8 ? 'quarti' : n >= 4 ? 'semifinale' : 'finale'
+  const pairs: { casa: Squadra; ospite: Squadra; fase: Partita['fase'] }[] = []
+  for (let i = 0; i < n / 2; i++)
+    pairs.push({ casa: qualificate[i], ospite: qualificate[n - 1 - i], fase })
+  return pairs
 }
