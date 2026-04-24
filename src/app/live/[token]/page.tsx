@@ -2,7 +2,7 @@
 import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase'
-import type { Torneo, Squadra, Partita, Campo } from '@/lib/types'
+import type { Torneo, Squadra, Partita, Campo, Girone } from '@/lib/types'
 import { calcolaClassifica, generaEliminatoria } from '@/lib/types'
 import LogoSquadra from '@/components/LogoSquadra'
 
@@ -14,6 +14,7 @@ export default function LivePage() {
   const [squadre, setSquadre] = useState<Squadra[]>([])
   const [partite, setPartite] = useState<Partita[]>([])
   const [campi, setCampi] = useState<Campo[]>([])
+  const [gironiObj, setGironiObj] = useState<Girone[]>([])
   const [loading, setLoading] = useState(true)
   const [invalid, setInvalid] = useState(false)
   const [tab, setTab] = useState<LiveTab>('risultati')
@@ -31,10 +32,12 @@ export default function LivePage() {
           sb.from('squadre').select('*').eq('torneo_id', t.id),
           sb.from('partite').select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(nome)').eq('torneo_id', t.id).order('data_ora', { nullsFirst: false }),
           sb.from('campi').select('*').eq('torneo_id', t.id).order('ordine'),
+          sb.from('gironi').select('*').eq('torneo_id', t.id).order('ordine'),
         ])
         setSquadre(sq.data ?? [])
         setPartite((pa.data ?? []) as Partita[])
         setCampi(ca.data ?? [])
+        setGironiObj((gi as any).data ?? [])
         setLoading(false)
       })
   }, [token])
@@ -65,15 +68,16 @@ export default function LivePage() {
     if (!torneo) return
     setGenerando(true)
     const sb = createClient()
-    const gironi = Array.from(new Set(squadre.map(s => s.girone).filter(Boolean))) as string[]
     const nElim = (torneo as any).n_squadre_eliminatoria ?? 4
-    const nPerGirone = Math.ceil(nElim / Math.max(gironi.length, 1))
+    const nPerGirone = Math.ceil(nElim / Math.max(gironiObj.length, 1))
     const classifiche: Record<string, any[]> = {}
-    for (const g of gironi) classifiche[g] = calcolaClassifica(squadre, partite, g)
+    for (const g of gironiObj) classifiche[g.id] = calcolaClassifica(squadre, partite, g.id)
+    const finaleTP = (torneo as any).finale_terzo_posto ?? false
     const accoppiamenti = generaEliminatoria(
-      gironi.length > 0 ? gironi : [''],
-      gironi.length > 0 ? classifiche : { '': calcolaClassifica(squadre, partite) },
-      nPerGirone
+      gironiObj.length > 0 ? gironiObj : [{ id: '', nome: '', torneo_id: '', campo_id: null, ordine: 0 }],
+      gironiObj.length > 0 ? classifiche : { '': calcolaClassifica(squadre, partite) },
+      nPerGirone,
+      finaleTP
     )
     if (accoppiamenti.length === 0) {
       showMsg('Nessun accoppiamento generabile. Verifica i risultati dei gironi.', 'err')
