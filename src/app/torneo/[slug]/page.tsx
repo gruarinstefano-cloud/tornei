@@ -19,6 +19,7 @@ export default function TorneoPage() {
   const [sponsor, setSponsor] = useState<Sponsor[]>([])
   const [giornate, setGiornate] = useState<Giornata[]>([])
   const [pause, setPause] = useState<Pausa[]>([])
+  const [gironiObj, setGironiObj] = useState<any[]>([])
   const [tab, setTab] = useState<Tab>('gironi')
   const [loading, setLoading] = useState(true)
 
@@ -34,6 +35,7 @@ export default function TorneoPage() {
           sb.from('campi').select('*').eq('torneo_id', t.id).order('ordine'),
           sb.from('sponsor').select('*').eq('torneo_id', t.id).order('ordine'),
           sb.from('giornate').select('*, slot:slot_campo(*)').eq('torneo_id', t.id).order('data'),
+          sb.from('gironi').select('*').eq('torneo_id', t.id).order('ordine'),
           sb.from('pause').select('*').eq('torneo_id', t.id).order('ordine_calendario'),
         ])
         setSquadre(sq.data ?? [])
@@ -42,6 +44,7 @@ export default function TorneoPage() {
         setSponsor(sp.data ?? [])
         setGiornate((gn as any).data ?? [])
         setPause((pu as any).data ?? [])
+        setGironiObj((gi2 as any).data ?? [])
         setLoading(false)
       })
   }, [slug])
@@ -58,7 +61,7 @@ export default function TorneoPage() {
   )
 
   const primary = torneo.colore_primario || '#1e40af'
-  const gironi = Array.from(new Set(squadre.map(s => s.girone).filter(Boolean))) as string[]
+  const gironiNomi = Array.from(new Set(squadre.map(s => s.girone).filter(Boolean))) as string[]
   const fasi: Partita['fase'][] = ['quarti', 'semifinale', 'finale', 'terzo_posto']
   const partiteElim = partite.filter(p => fasi.includes(p.fase))
   const giocate = partite.filter(p => p.giocata && !fasi.includes(p.fase))
@@ -87,13 +90,15 @@ export default function TorneoPage() {
         {/* GIRONI */}
         {tab === 'gironi' && (
           <div className="grid gap-5 md:grid-cols-2">
-            {gironi.map(g => {
-              const stats = calcolaClassifica(squadre, partite, g)
+            {(gironiObj.length > 0 ? gironiObj : gironiNomi.map((n: string) => ({ id: n, nome: n }))).map((g: any) => {
+              const stats = gironiObj.length > 0
+                ? calcolaClassifica(squadre, partite, g.id)
+                : calcolaClassifica(squadre.filter(s => s.girone === g.nome), partite)
               return (
-                <div key={g} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                <div key={g.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100"
                     style={{ background: primary + '10' }}>
-                    Girone {g}
+                    Girone {g.nome}
                   </div>
                   <table className="w-full text-sm">
                     <thead><tr className="border-b border-gray-100">
@@ -212,8 +217,8 @@ export default function TorneoPage() {
                             const p = item.data
                             const orario = orariMap.get(p.id)
                             return (
-                              <div key={p.id} className="px-4 py-3 border-b border-gray-50 last:border-0">
-                                <div className="flex items-center gap-2 mb-1">
+                              <div key={p.id} className="border-b border-gray-50 last:border-0 px-3 py-3">
+                                <div className="flex items-center justify-center gap-2 mb-1.5">
                                   {orario && <span className="text-xs font-mono font-semibold text-blue-600">{formatOra(orario)}</span>}
                                   {p.giocata && <span className="text-xs text-green-600">✓</span>}
                                   {p.girone && <span className="text-xs text-gray-400">Girone {p.girone}</span>}
@@ -221,17 +226,19 @@ export default function TorneoPage() {
                                     <span className="text-xs text-purple-500 capitalize">{p.fase}</span>
                                   )}
                                 </div>
-                                <div className="flex items-center gap-2">
-                                  <div className="flex items-center gap-1.5 flex-1 justify-end">
-                                    <span className="text-sm font-medium truncate">{p.squadra_casa?.nome}</span>
-                                    <LogoSquadra squadra={p.squadra_casa!} size={20}/>
+                                <div className="flex items-center">
+                                  <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+                                    <LogoSquadra squadra={p.squadra_casa!} size={28}/>
+                                    <span className="text-xs font-medium text-gray-800 text-center leading-tight w-full px-1 line-clamp-2">{p.squadra_casa?.nome}</span>
                                   </div>
-                                  <span className="px-2 py-0.5 bg-gray-100 rounded font-bold text-xs min-w-[44px] text-center">
-                                    {p.giocata ? `${p.gol_casa}–${p.gol_ospite}` : 'vs'}
-                                  </span>
-                                  <div className="flex items-center gap-1.5 flex-1">
-                                    <LogoSquadra squadra={p.squadra_ospite!} size={20}/>
-                                    <span className="text-sm font-medium truncate">{p.squadra_ospite?.nome}</span>
+                                  <div className="flex-shrink-0 mx-2">
+                                    <span className="block px-2 py-1 bg-gray-100 rounded-lg font-bold text-xs min-w-[44px] text-center">
+                                      {p.giocata ? `${p.gol_casa}–${p.gol_ospite}` : 'vs'}
+                                    </span>
+                                  </div>
+                                  <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+                                    <LogoSquadra squadra={p.squadra_ospite!} size={28}/>
+                                    <span className="text-xs font-medium text-gray-800 text-center leading-tight w-full px-1 line-clamp-2">{p.squadra_ospite?.nome}</span>
                                   </div>
                                 </div>
                               </div>
