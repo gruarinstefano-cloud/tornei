@@ -28,7 +28,7 @@ export default function LivePage() {
       .then(async ({ data: t, error }) => {
         if (!t || error) { setInvalid(true); setLoading(false); return }
         setTorneo(t)
-        const [sq, pa, ca] = await Promise.all([
+        const [sq, pa, ca, gi] = await Promise.all([
           sb.from('squadre').select('*').eq('torneo_id', t.id),
           sb.from('partite').select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(nome)').eq('torneo_id', t.id).order('data_ora', { nullsFirst: false }),
           sb.from('campi').select('*').eq('torneo_id', t.id).order('ordine'),
