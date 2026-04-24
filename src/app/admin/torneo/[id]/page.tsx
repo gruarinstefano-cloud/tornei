@@ -614,25 +614,27 @@ function RisultatoRow({ p, onSave }: { p: Partita; onSave: (gc: number, go: numb
   const [gc, setGc] = useState(p.gol_casa ?? 0)
   const [go, setGo] = useState(p.gol_ospite ?? 0)
   return (
-    <div className="flex items-center gap-3 px-4 py-3">
-      <div className="flex items-center gap-1.5 flex-1 justify-end">
-        <span className="flex-1 text-right text-sm font-medium truncate">{(p.squadra_casa as any)?.nome ?? '–'}</span>
-        <LogoSquadra squadra={(p.squadra_casa as any) ?? { nome:'?', logo_url:null }} size={22}/>
-      </div>
-      <div className="flex items-center gap-1">
-        <input type="number" min="0" max="20" value={gc} onChange={e => setGc(+e.target.value)}
-          className="w-12 text-center px-1 py-1 border border-gray-300 rounded text-sm font-bold"/>
-        <span className="text-gray-400">–</span>
-        <input type="number" min="0" max="20" value={go} onChange={e => setGo(+e.target.value)}
-          className="w-12 text-center px-1 py-1 border border-gray-300 rounded text-sm font-bold"/>
-      </div>
-      <div className="flex items-center gap-1.5 flex-1">
-        <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={22}/>
-        <span className="flex-1 text-sm font-medium truncate">{(p.squadra_ospite as any)?.nome ?? '–'}</span>
-      </div>
-      <button onClick={() => onSave(gc, go)}
-        className={`flex-shrink-0 px-3 py-1 rounded text-xs font-medium ${p.giocata ? 'bg-green-100 text-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
-        {p.giocata ? '✓' : 'Salva'}
+    <div className="border-b border-gray-50 last:border-0 px-3 py-3">
+      <div className="flex items-center">
+        {/* Squadra casa */}
+        <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
+          <LogoSquadra squadra={(p.squadra_casa as any) ?? { nome:'?', logo_url:null }} size={28}/>
+          <span className="text-xs font-medium text-gray-800 text-center leading-tight w-full px-1 line-clamp-2">
+            {(p.squadra_casa as any)?.nome ?? '–'}
+          </span>
+        </div>
+        {/* Input risultato */}
+        <div className="flex-shrink-0 mx-2 flex flex-col items-center gap-1.5">
+          <div className="flex items-center gap-1">
+            <input type="number" min="0" max="20" value={gc} onChange={e => setGc(+e.target.value)}
+              className="w-11 text-center px-1 py-1.5 border border-gray-300 rounded-lg text-sm font-bold"/>
+            <span className="text-gray-400 text-sm">–</span>
+            <input type="number" min="0" max="20" value={go} onChange={e => setGo(+e.target.value)}
+              className="w-11 text-center px-1 py-1.5 border border-gray-300 rounded-lg text-sm font-bold"/>
+          </div>
+          <button onClick={() => onSave(gc, go)}
+            className={`px-4 py-1 rounded-lg text-xs font-medium ${p.giocata ? 'bg-green-100 text-green-700' : 'bg-blue-600 text-white hover:bg-blue-700'}`}>
+            {p.giocata ? '✓ Aggiorna' : 'Salva'}
       </button>
     </div>
   )
