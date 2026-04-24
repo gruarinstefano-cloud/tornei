@@ -29,7 +29,7 @@ export default function TorneoPage() {
       .then(async ({ data: t }) => {
         if (!t) { setLoading(false); return }
         setTorneo(t)
-        const [sq, pa, ca, sp, gn, pu] = await Promise.all([
+        const [sq, pa, ca, sp, gn, gi2, pu] = await Promise.all([
           sb.from('squadre').select('*').eq('torneo_id', t.id),
           sb.from('partite').select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)').eq('torneo_id', t.id).order('data_ora', { ascending: true, nullsFirst: false }),
           sb.from('campi').select('*').eq('torneo_id', t.id).order('ordine'),
@@ -43,8 +43,8 @@ export default function TorneoPage() {
         setCampi(ca.data ?? [])
         setSponsor(sp.data ?? [])
         setGiornate((gn as any).data ?? [])
-        setPause((pu as any).data ?? [])
         setGironiObj((gi2 as any).data ?? [])
+        setPause((pu as any).data ?? [])
         setLoading(false)
       })
   }, [slug])
