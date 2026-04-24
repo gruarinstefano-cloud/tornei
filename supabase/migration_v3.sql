@@ -3,10 +3,10 @@
 -- Esegui in Supabase > SQL Editor
 -- =========================================
 
--- Aggiunge colonna banner_url al torneo (immagine in cima)
+-- Aggiunge colonna banner_url al torneo
 alter table public.tornei add column if not exists banner_url text;
 
--- Sostituisce il vecchio array sponsor (stringhe) con una tabella dedicata
+-- Crea tabella sponsor dedicata
 create table if not exists public.sponsor (
   id uuid default gen_random_uuid() primary key,
   torneo_id uuid references public.tornei(id) on delete cascade not null,
@@ -22,14 +22,13 @@ create policy "Sponsor gestibili dall'admin del torneo" on public.sponsor
   for all using (
     exists (select 1 from public.tornei t where t.id = torneo_id and t.admin_id = auth.uid())
   );
-create index if not exists on public.sponsor(torneo_id);
+create index if not exists idx_sponsor_torneo_id on public.sponsor(torneo_id);
 
--- Aggiungi bucket per banner e loghi sponsor (se non esiste già)
+-- Bucket per banner e loghi sponsor
 insert into storage.buckets (id, name, public)
 values ('banner', 'banner', true)
 on conflict (id) do nothing;
 
--- Policy storage banner
 create policy "Banner pubblici"
   on storage.objects for select
   using (bucket_id = 'banner');
