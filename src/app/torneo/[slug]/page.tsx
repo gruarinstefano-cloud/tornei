@@ -38,7 +38,7 @@ export default function TorneoPage() {
   if (loading) return <div className="flex items-center justify-center min-h-screen"><div className="animate-spin w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full"/></div>
   if (!torneo) return <div className="text-center py-20 text-gray-500">Torneo non trovato. <Link href="/" className="text-blue-600">Torna alla lista</Link></div>
 
-  const gironi = [...new Set(squadre.map(s => s.girone).filter(Boolean))] as string[]
+  const gironi = Array.from(new Set(squadre.map(s => s.girone).filter(Boolean))) as string[]
   const fasi: Partita['fase'][] = ['quarti','semifinale','finale','terzo_posto']
   const partiteElim = partite.filter(p => fasi.includes(p.fase))
   const giocate = partite.filter(p => p.giocata)
