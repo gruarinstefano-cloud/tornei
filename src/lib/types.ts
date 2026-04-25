@@ -38,13 +38,22 @@ export type SlotCampo = {
   campo?: Campo
 }
 
+export type GironeCampo = {
+  id: string
+  girone_id: string
+  campo_id: string
+  ordine: number
+  campo?: Campo
+}
+
 export type Girone = {
   id: string
   torneo_id: string
   nome: string
-  campo_id: string | null
+  campo_id: string | null   // legacy, primo campo
   ordine: number
   campo?: Campo
+  girone_campi?: GironeCampo[]  // tutti i campi del girone
 }
 
 export type Sponsor = {
@@ -143,6 +152,34 @@ export function generaRoundRobin(squadre: Squadra[]): [Squadra, Squadra][] {
     for (let j=i+1; j<squadre.length; j++)
       pairs.push([squadre[i], squadre[j]])
   return pairs
+}
+
+// Distribuisce partite tra più campi in modo alternato (round-robin sui campi)
+// Rispetta anche il vincolo interleaved: nessuna squadra gioca 2 volte di fila
+export function distribuisciSuCampi(
+  pairs: [Squadra, Squadra][],
+  campoIds: string[]
+): { pair: [Squadra, Squadra]; campo_id: string }[] {
+  if (campoIds.length <= 1) {
+    return pairs.map(pair => ({ pair, campo_id: campoIds[0] ?? '' }))
+  }
+  // Assegna in modo alternato per campo, rispettando interleaved
+  const result: { pair: [Squadra, Squadra]; campo_id: string }[] = []
+  const perCampo: [Squadra, Squadra][][] = campoIds.map(() => [])
+  // Distribuisce round-robin sulle coppie ordinate
+  pairs.forEach((pair, i) => {
+    perCampo[i % campoIds.length].push(pair)
+  })
+  // Ricostruisce la lista interleaved per campo
+  const maxLen = Math.max(...perCampo.map(p => p.length))
+  for (let i = 0; i < maxLen; i++) {
+    for (let c = 0; c < campoIds.length; c++) {
+      if (perCampo[c][i]) {
+        result.push({ pair: perCampo[c][i], campo_id: campoIds[c] })
+      }
+    }
+  }
+  return result
 }
 
 export function generaCalendarioInterleaved(pairs: [Squadra, Squadra][]): [Squadra, Squadra][] {

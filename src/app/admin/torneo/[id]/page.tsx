@@ -5,8 +5,9 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import type { Torneo, Squadra, Partita, Campo, Sponsor, Girone, Pausa, CalendarioItem, Giornata, SlotCampo } from '@/lib/types'
-import { calcolaClassifica, generaRoundRobin, generaCalendarioInterleaved, generaEliminatoria, formatDataBreve } from '@/lib/types'
+import { calcolaClassifica, generaRoundRobin, generaCalendarioInterleaved, distribuisciSuCampi, generaEliminatoria, formatDataBreve } from '@/lib/types'
 import LogoSquadra from '@/components/LogoSquadra'
+import { resizeImage } from '@/lib/imageResize'
 import LinkPrivatoTab from '@/components/LinkPrivatoTab'
 import GironiTab from '@/components/GironiTab'
 import CalendarioCampo from '@/components/CalendarioCampo'
@@ -56,7 +57,7 @@ export default function AdminTorneoPage() {
         sb.from('tornei').select('*').eq('id', id).single(),
         sb.from('squadre').select('*').eq('torneo_id', id),
         sb.from('campi').select('*').eq('torneo_id', id).order('ordine'),
-        sb.from('gironi').select('*, campo:campi(*)').eq('torneo_id', id).order('ordine'),
+        sb.from('gironi').select('*, campo:campi(*), girone_campi:girone_campi(*, campo:campi(*))').eq('torneo_id', id).order('ordine'),
         sb.from('giornate').select('*, slot:slot_campo(*)').eq('torneo_id', id).order('data'),
         sb.from('partite').select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)').eq('torneo_id', id).order('ordine_calendario'),
         sb.from('pause').select('*').eq('torneo_id', id).order('ordine_calendario'),
@@ -170,9 +171,15 @@ export default function AdminTorneoPage() {
       for (const g of gironi) {
         const sq = squadre.filter(s => s.girone_id === g.id)
         if (sq.length < 2) continue
-        generaCalendarioInterleaved(generaRoundRobin(sq)).forEach(([a,b]) => toInsert.push({
+        const pairs = generaCalendarioInterleaved(generaRoundRobin(sq))
+        // Recupera tutti i campi del girone
+        const campiIds = (g.girone_campi && g.girone_campi.length > 0)
+          ? g.girone_campi.sort((a: any, b: any) => a.ordine - b.ordine).map((gc: any) => gc.campo_id)
+          : g.campo_id ? [g.campo_id] : [null]
+        const distribuiti = distribuisciSuCampi(pairs, campiIds.filter(Boolean) as string[])
+        distribuiti.forEach(({ pair: [a, b], campo_id }) => toInsert.push({
           torneo_id: id, squadra_casa_id: a.id, squadra_ospite_id: b.id,
-          campo_id: g.campo_id || null, girone_id: g.id, giornata_id: giornataDefault,
+          campo_id: campo_id || null, girone_id: g.id, giornata_id: giornataDefault,
           fase: 'girone', girone: g.nome, giocata: false, ordine_calendario: ordine++
         }))
       }
@@ -234,9 +241,9 @@ export default function AdminTorneoPage() {
 
   async function uploadLogo(squadraId: string, file: File) {
     const sb = createClient()
-    const ext = file.name.split('.').pop()
-    const path = `${id}/${squadraId}.${ext}`
-    await sb.storage.from('loghi').upload(path, file, { upsert: true })
+    const resized = await resizeImage(file, 'logo_squadra')
+    const path = `${id}/${squadraId}.jpg`
+    await sb.storage.from('loghi').upload(path, resized, { upsert: true, contentType: 'image/jpeg' })
     const { data: { publicUrl } } = sb.storage.from('loghi').getPublicUrl(path)
     await sb.from('squadre').update({ logo_url: publicUrl }).eq('id', squadraId)
     setSquadre(prev => prev.map(s => s.id===squadraId ? { ...s, logo_url: publicUrl } : s))
@@ -260,9 +267,9 @@ export default function AdminTorneoPage() {
 
   async function uploadLogoSponsor(sponsorId: string, file: File) {
     const sb = createClient()
-    const ext = file.name.split('.').pop()
-    const path = `${id}/sponsor_${sponsorId}.${ext}`
-    await sb.storage.from('banner').upload(path, file, { upsert: true })
+    const resized = await resizeImage(file, 'logo_sponsor')
+    const path = `${id}/sponsor_${sponsorId}.jpg`
+    await sb.storage.from('banner').upload(path, resized, { upsert: true, contentType: 'image/jpeg' })
     const { data: { publicUrl } } = sb.storage.from('banner').getPublicUrl(path)
     await sb.from('sponsor').update({ logo_url: publicUrl }).eq('id', sponsorId)
     setSponsors(prev => prev.map(s => s.id===sponsorId ? { ...s, logo_url: publicUrl } : s))
@@ -511,8 +518,9 @@ export default function AdminTorneoPage() {
             onChange={async e => {
               const file = e.target.files?.[0]; if (!file) return
               const sb = createClient()
-              const path = `${id}/banner.${file.name.split('.').pop()}`
-              await sb.storage.from('banner').upload(path, file, { upsert: true })
+              const resizedBanner = await resizeImage(file, 'banner')
+              const path = `${id}/banner.jpg`
+              await sb.storage.from('banner').upload(path, resizedBanner, { upsert: true, contentType: 'image/jpeg' })
               const { data: { publicUrl } } = sb.storage.from('banner').getPublicUrl(path)
               await sb.from('tornei').update({ banner_url: publicUrl }).eq('id', id)
               setTorneo(p => ({ ...p, banner_url: publicUrl }))
