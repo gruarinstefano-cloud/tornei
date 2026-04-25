@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import type { Torneo, Girone, Campo, Giornata, SlotCampo } from '@/lib/types'
+import type { Torneo, Girone, Campo, Giornata, SlotCampo, GironeCampo } from '@/lib/types'
 import { formatDataBreve } from '@/lib/types'
 
 type Props = {
@@ -47,11 +47,33 @@ export default function ImpostazioniTab({
     onGironiChange(gironi.filter(g => g.id !== gid))
   }
 
-  async function updateGironeCampo(gid: string, campoId: string) {
-    await sb.from('gironi').update({ campo_id: campoId || null }).eq('id', gid)
-    onGironiChange(gironi.map(g => g.id === gid
-      ? { ...g, campo_id: campoId || null, campo: campi.find(c => c.id === campoId) }
+  async function addGironeCampo(gironeId: string, campoId: string) {
+    if (!campoId) return
+    const already = gironi.find(g => g.id === gironeId)?.girone_campi?.find(gc => gc.campo_id === campoId)
+    if (already) return
+    const { data } = await sb.from('girone_campi').insert({
+      girone_id: gironeId, campo_id: campoId, ordine: 0
+    }).select('*, campo:campi(*)').single()
+    if (!data) return
+    // Aggiorna anche campo_id legacy se è il primo campo
+    const girone = gironi.find(g => g.id === gironeId)
+    const isFirst = !girone?.girone_campi?.length
+    if (isFirst) await sb.from('gironi').update({ campo_id: campoId }).eq('id', gironeId)
+    onGironiChange(gironi.map(g => g.id === gironeId
+      ? { ...g,
+          campo_id: isFirst ? campoId : g.campo_id,
+          girone_campi: [...(g.girone_campi ?? []), data] }
       : g))
+  }
+
+  async function removeGironeCampo(gironeId: string, campoId: string) {
+    await sb.from('girone_campi').delete().eq('girone_id', gironeId).eq('campo_id', campoId)
+    onGironiChange(gironi.map(g => {
+      if (g.id !== gironeId) return g
+      const newCampi = (g.girone_campi ?? []).filter(gc => gc.campo_id !== campoId)
+      const newFirst = newCampi[0]?.campo_id ?? null
+      return { ...g, campo_id: newFirst, girone_campi: newCampi }
+    }))
   }
 
   // ---- CAMPI ----
@@ -287,6 +309,12 @@ export default function ImpostazioniTab({
       {/* ===== GIRONI ===== */}
       {!isNuovo && (
         <Section title="Gironi">
+          {torneo.tipo === 'campionato_eliminazione' ? (
+            <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
+              In modalità <strong>Campionato + Eliminazione</strong> c'è un unico girone. Aggiungi direttamente le squadre nella sezione Squadre.
+            </div>
+          ) : (
+          <>
           <div className="flex gap-2 mb-3">
             <input value={nuovoGirone} onChange={e => setNuovoGirone(e.target.value)}
               className={`${inp} flex-1`} placeholder="Nome girone (es. A, B...)"
@@ -296,20 +324,38 @@ export default function ImpostazioniTab({
           {gironi.length === 0
             ? <p className="text-sm text-gray-400 text-center py-3">Nessun girone ancora</p>
             : gironi.map(g => (
-              <div key={g.id} className="flex items-center gap-3 py-2 border-b border-gray-50 last:border-0">
-                <span className="font-bold text-gray-800 w-16">Girone {g.nome}</span>
-                <div className="flex items-center gap-2 flex-1">
-                  <label className="text-xs text-gray-400">Campo:</label>
-                  <select value={g.campo_id || ''} onChange={e => updateGironeCampo(g.id, e.target.value)}
-                    className="px-2 py-1 border border-gray-300 rounded text-sm flex-1">
-                    <option value="">Nessun campo dedicato</option>
-                    {campi.map(c => <option key={c.id} value={c.id}>{c.nome}</option>)}
-                  </select>
+              <div key={g.id} className="py-2 border-b border-gray-50 last:border-0">
+                <div className="flex items-center gap-3 mb-1.5">
+                  <span className="font-bold text-gray-800 w-16 flex-shrink-0">Girone {g.nome}</span>
+                  <div className="flex items-center gap-2 flex-1 flex-wrap">
+                    {(g.girone_campi ?? []).map(gc => (
+                      <div key={gc.campo_id} className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-lg text-xs">
+                        <span className="w-2 h-2 rounded-full flex-shrink-0"
+                          style={{ background: campi.find(cc => cc.id === gc.campo_id)?.colore ?? '#ccc' }}/>
+                        <span>{campi.find(cc => cc.id === gc.campo_id)?.nome ?? '–'}</span>
+                        <button onClick={() => removeGironeCampo(g.id, gc.campo_id)}
+                          className="ml-1 text-gray-400 hover:text-red-500 leading-none">✕</button>
+                      </div>
+                    ))}
+                    <select value="" onChange={e => e.target.value && addGironeCampo(g.id, e.target.value)}
+                      className="px-2 py-1 border border-dashed border-gray-300 rounded text-xs text-gray-500 bg-transparent">
+                      <option value="">+ Aggiungi campo...</option>
+                      {campi.filter(cc => !(g.girone_campi ?? []).find(gc => gc.campo_id === cc.id))
+                        .map(cc => <option key={cc.id} value={cc.id}>{cc.nome}</option>)}
+                    </select>
+                  </div>
+                  <button onClick={() => delGirone(g.id)} className="text-red-400 hover:text-red-600 text-xs flex-shrink-0">✕</button>
                 </div>
-                <button onClick={() => delGirone(g.id)} className="text-red-400 hover:text-red-600 text-xs">✕</button>
+                {(g.girone_campi ?? []).length > 1 && (
+                  <p className="text-xs text-blue-500 ml-20">
+                    Partite distribuite automaticamente su {(g.girone_campi ?? []).length} campi
+                  </p>
+                )}
               </div>
             ))
           }
+          </>
+          )}
         </Section>
       )}
 

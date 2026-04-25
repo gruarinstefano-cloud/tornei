@@ -74,9 +74,9 @@ function SponsorBadge({ sponsor }: { sponsor: Sponsor }) {
     <Image
       src={sponsor.logo_url}
       alt={sponsor.nome}
-      width={80}
-      height={36}
-      className="object-contain max-h-9"
+      width={120}
+      height={60}
+      className="object-contain"
     />
   ) : (
     <span className="text-sm font-medium text-gray-600 whitespace-nowrap px-2">{sponsor.nome}</span>
