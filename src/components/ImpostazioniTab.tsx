@@ -1,7 +1,7 @@
 'use client'
 import { useState } from 'react'
 import { createClient } from '@/lib/supabase'
-import type { Torneo, Girone, Campo, Giornata, SlotCampo, GironeCampo } from '@/lib/types'
+import type { Torneo, Girone, Campo, Giornata, GironeCampo } from '@/lib/types'
 import { formatDataBreve } from '@/lib/types'
 
 type Props = {
