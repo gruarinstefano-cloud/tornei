@@ -172,7 +172,6 @@ export default function ImpostazioniTab({
             </select>
           </div>
         </div>
-        {torneo.tipo !== 'solo_campionato' && (
         <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
           <input type="checkbox" id="andataRitorno" checked={torneo.andata_ritorno ?? false}
             onChange={e => onTorneoChange({ ...torneo, andata_ritorno: e.target.checked })}
@@ -184,7 +183,6 @@ export default function ImpostazioniTab({
             <p className="text-xs text-gray-400">Ogni coppia si affronta due volte (casa e trasferta invertite)</p>
           </div>
         </div>
-        )}
         <div className="grid grid-cols-2 gap-4">
           <div>
             <label className={lbl}>Nome società</label>
