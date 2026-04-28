@@ -137,21 +137,38 @@ export default function CalendarioBoard({
 }
 
 function PartitaRow({ p, orario }: { p: Partita; orario?: Date }) {
+  const nomeCasa = (p.squadra_casa as any)?.nome ?? '–'
+  const nomeOspite = (p.squadra_ospite as any)?.nome ?? '–'
   return (
-    <div className="flex items-center gap-1.5 px-2 py-2 hover:bg-gray-50 select-none">
-      <span className="text-gray-300 text-xs flex-shrink-0">⠿</span>
-      {orario && <span className="text-xs font-mono text-blue-600 w-9 flex-shrink-0">{formatOra(orario)}</span>}
-      <div className="flex flex-col items-center gap-0.5 flex-1 min-w-0">
-        <div className="flex items-center gap-1 w-full justify-center">
-          <LogoSquadra squadra={(p.squadra_casa as any) ?? { nome:'?', logo_url:null }} size={16}/>
-          <span className="text-xs font-medium truncate max-w-[60px]">{(p.squadra_casa as any)?.nome ?? '–'}</span>
-        </div>
-        <span className={`text-xs font-bold px-2 py-0.5 rounded ${p.giocata ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+    <div className="hover:bg-gray-50 select-none px-2 py-2">
+      {/* Desktop: riga unica */}
+      <div className="hidden sm:flex items-center gap-1.5">
+        <span className="text-gray-300 text-xs flex-shrink-0 cursor-grab">⠿</span>
+        {orario && <span className="text-xs font-mono text-blue-600 w-9 flex-shrink-0">{formatOra(orario)}</span>}
+        <LogoSquadra squadra={(p.squadra_casa as any) ?? { nome:'?', logo_url:null }} size={18}/>
+        <span className="text-xs font-medium flex-1 text-right" title={nomeCasa}>{nomeCasa}</span>
+        <span className={`text-xs font-bold px-2 py-0.5 rounded flex-shrink-0 ${p.giocata ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
           {p.giocata ? `${p.gol_casa}–${p.gol_ospite}` : 'vs'}
         </span>
-        <div className="flex items-center gap-1 w-full justify-center">
-          <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={16}/>
-          <span className="text-xs font-medium truncate max-w-[60px]">{(p.squadra_ospite as any)?.nome ?? '–'}</span>
+        <span className="text-xs font-medium flex-1" title={nomeOspite}>{nomeOspite}</span>
+        <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={18}/>
+      </div>
+      {/* Mobile: centrato verticale */}
+      <div className="flex sm:hidden items-center gap-1">
+        <span className="text-gray-300 text-xs flex-shrink-0 cursor-grab">⠿</span>
+        {orario && <span className="text-xs font-mono text-blue-600 w-8 flex-shrink-0">{formatOra(orario)}</span>}
+        <div className="flex flex-col items-center flex-1 gap-0.5">
+          <div className="flex items-center gap-1 justify-center">
+            <LogoSquadra squadra={(p.squadra_casa as any) ?? { nome:'?', logo_url:null }} size={16}/>
+            <span className="text-xs font-medium text-center">{nomeCasa}</span>
+          </div>
+          <span className={`text-xs font-bold px-2 py-0.5 rounded ${p.giocata ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-500'}`}>
+            {p.giocata ? `${p.gol_casa}–${p.gol_ospite}` : 'vs'}
+          </span>
+          <div className="flex items-center gap-1 justify-center">
+            <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={16}/>
+            <span className="text-xs font-medium text-center">{nomeOspite}</span>
+          </div>
         </div>
       </div>
     </div>

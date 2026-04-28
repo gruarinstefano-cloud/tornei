@@ -16,13 +16,14 @@ type Props = {
   onGironiChange: (g: Girone[]) => void
   onCampiChange: (c: Campo[]) => void
   onGiornateChange: (g: Giornata[]) => void
+  onRenameCampo?: (campoId: string, nome: string) => void
   onSave: () => void
   saving: boolean
 }
 
 export default function ImpostazioniTab({
   torneoId, isNuovo, torneo, gironi, campi, giornate,
-  onTorneoChange, onGironiChange, onCampiChange, onGiornateChange,
+  onTorneoChange, onGironiChange, onCampiChange, onGiornateChange, onRenameCampo,
   onSave, saving
 }: Props) {
   const [nuovoGirone, setNuovoGirone] = useState('')
@@ -308,14 +309,10 @@ export default function ImpostazioniTab({
           </div>
           {campi.length === 0
             ? <p className="text-sm text-gray-400 text-center py-3">Nessun campo ancora</p>
-            : campi.map(c => (
-              <div key={c.id} className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0">
-                <div className="flex items-center gap-2">
-                  <span className="w-3 h-3 rounded-full" style={{ background: c.colore }}/>
-                  <span className="font-medium text-sm">{c.nome}</span>
-                </div>
-                <button onClick={() => delCampo(c.id)} className="text-red-400 hover:text-red-600 text-xs">Rimuovi</button>
-              </div>
+            : campi.map(cc => (
+              <CampoRow key={cc.id} campo={cc}
+                onRename={onRenameCampo ? (nome) => onRenameCampo(cc.id, nome) : undefined}
+                onDelete={() => delCampo(cc.id)}/>
             ))
           }
         </Section>
@@ -395,6 +392,37 @@ function Section({ title, children }: { title: string; children: React.ReactNode
         <h3 className="text-sm font-semibold text-gray-700">{title}</h3>
       </div>
       <div className="p-4 space-y-3">{children}</div>
+    </div>
+  )
+}
+
+function CampoRow({ campo, onRename, onDelete }: {
+  campo: import('@/lib/types').Campo
+  onRename?: (nome: string) => void
+  onDelete: () => void
+}) {
+  const [editing, setEditing] = useState(false)
+  const [nome, setNome] = useState(campo.nome)
+  return (
+    <div className="flex items-center justify-between py-2 border-b border-gray-50 last:border-0 gap-2">
+      <div className="flex items-center gap-2 flex-1 min-w-0">
+        <span className="w-3 h-3 rounded-full flex-shrink-0" style={{ background: campo.colore }}/>
+        {editing && onRename ? (
+          <div className="flex items-center gap-2 flex-1">
+            <input value={nome} onChange={e => setNome(e.target.value)} autoFocus
+              className="flex-1 px-2 py-1 border border-gray-300 rounded text-sm"
+              onKeyDown={e => { if(e.key==='Enter'){onRename(nome);setEditing(false)} if(e.key==='Escape')setEditing(false) }}/>
+            <button onClick={() => { onRename(nome); setEditing(false) }} className="text-green-600 text-xs font-medium">✓</button>
+            <button onClick={() => setEditing(false)} className="text-gray-400 text-xs">✕</button>
+          </div>
+        ) : (
+          <div className="flex items-center gap-2 flex-1">
+            <span className="font-medium text-sm">{campo.nome}</span>
+            {onRename && <button onClick={() => setEditing(true)} className="text-xs text-gray-400 hover:text-gray-600">✏️</button>}
+          </div>
+        )}
+      </div>
+      <button onClick={onDelete} className="text-red-400 hover:text-red-600 text-xs flex-shrink-0">Rimuovi</button>
     </div>
   )
 }
