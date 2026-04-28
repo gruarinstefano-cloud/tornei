@@ -108,7 +108,7 @@ export default function CalendarioBoard({
                     className={`transition-all ${isDragging ? 'opacity-30' : ''} ${overCampo === campo.id && overIdx === i && drag && drag.fromCampoId === campo.id && !isDragging ? 'border-t-2 border-blue-400' : ''}`}
                     style={{ cursor: 'grab' }}>
                     {item.kind === 'partita'
-                      ? <PartitaRow p={item.data} orario={orario}/>
+                      ? <PartitaRow p={item.data} orario={orario ?? undefined}/>
                       : <PausaRow p={item.data}
                           onDelete={() => onDeletePausa(item.data.id)}
                           onUpdate={u => onUpdatePausa(item.data.id, u)}/>
