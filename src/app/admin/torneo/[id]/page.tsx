@@ -10,7 +10,7 @@ import LogoSquadra from '@/components/LogoSquadra'
 import { resizeImage } from '@/lib/imageResize'
 import LinkPrivatoTab from '@/components/LinkPrivatoTab'
 import GironiTab from '@/components/GironiTab'
-import CalendarioCampo from '@/components/CalendarioCampo'
+import CalendarioBoard from '@/components/CalendarioBoard'
 import ImpostazioniTab from '@/components/ImpostazioniTab'
 
 type AdminTab = 'impostazioni' | 'squadre' | 'calendario' | 'risultati' | 'eliminatoria' | 'banner' | 'sponsor' | 'link'
@@ -113,7 +113,7 @@ export default function AdminTorneoPage() {
     return slot?.orario_inizio || (torneo.orario_inizio_default as string) || '09:00'
   }
 
-  async function handleReorder(campoId: string, giornataId: string, items: CalendarioItem[]) {
+  async function handleReorder(campoId: string, items: CalendarioItem[]) {
     const sb = createClient()
     await Promise.all(items.map((item, i) =>
       item.kind === 'partita'
@@ -168,12 +168,15 @@ export default function AdminTorneoPage() {
     const giornataDefault = giornate.find(g => g.id === giornataCalSel)?.id ?? giornate[0]?.id ?? null
 
     if (gironi.length === 0) {
-      // Modalità campionato: assegna automaticamente il primo campo disponibile
-      const campoCampionato = campi[0]?.id ?? null
-      generaCalendarioInterleaved(generaRoundRobin(squadre)).forEach(([a,b]) => toInsert.push({
+      // Modalità campionato/solo_campionato: distribuisce uniformemente su tutti i campi disponibili
+      const campiIds = campi.map(c => c.id)
+      const fase = torneo.tipo === 'solo_campionato' ? 'solo_campionato' : 'campionato'
+      const pairs = generaCalendarioInterleaved(generaRoundRobin(squadre))
+      const distribuiti = distribuisciSuCampi(pairs, campiIds)
+      distribuiti.forEach(({ pair: [a, b], campo_id }) => toInsert.push({
         torneo_id: id, squadra_casa_id: a.id, squadra_ospite_id: b.id,
-        campo_id: campoCampionato, girone_id: null, giornata_id: giornataDefault,
-        fase: 'campionato', girone: null, giocata: false, ordine_calendario: ordine++
+        campo_id: campo_id || null, girone_id: null, giornata_id: giornataDefault,
+        fase, girone: null, giocata: false, ordine_calendario: ordine++
       }))
     } else {
       for (const g of gironi) {
@@ -194,7 +197,7 @@ export default function AdminTorneoPage() {
     }
 
     if (toInsert.length === 0) { showMsg('Nessuna coppia. Verifica i gironi.', 'err'); setGenerando(false); return }
-    await sb.from('partite').delete().eq('torneo_id', id).in('fase', ['girone','campionato'])
+    await sb.from('partite').delete().eq('torneo_id', id).in('fase', ['girone','campionato','solo_campionato'])
     const { data, error } = await sb.from('partite').insert(toInsert)
       .select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)')
     if (error) showMsg('Errore: ' + error.message, 'err')
@@ -284,14 +287,15 @@ export default function AdminTorneoPage() {
     showMsg('Logo sponsor caricato!')
   }
 
-  const partiteGirone = partite.filter(p => ['girone','campionato'].includes(p.fase))
+  const partiteGirone = partite.filter(p => ['girone','campionato','solo_campionato'].includes(p.fase))
   const partiteElim   = partite.filter(p => ['quarti','semifinale','finale','terzo_posto'].includes(p.fase))
 
+  const isSoloCampionato = torneo.tipo === 'solo_campionato'
   const tabs: [AdminTab, string][] = [
     ['impostazioni','Impostazioni'], ['squadre','Squadre'],
     ['calendario','Calendario'], ['risultati','Risultati'],
-    ['eliminatoria','Eliminatoria'], ['banner','Banner'],
-    ['sponsor','Sponsor'], ['link','Link privato']
+    ...(!isSoloCampionato ? [['eliminatoria','Eliminatoria'] as [AdminTab,string]] : []),
+    ['banner','Banner'], ['sponsor','Sponsor'], ['link','Link privato']
   ]
 
   return (
@@ -425,26 +429,27 @@ export default function AdminTorneoPage() {
                 )
               })()}
 
-              <div className="grid gap-5 md:grid-cols-2">
-                {campi.map(c => {
-                  const giornata = giornate.find(g => g.id === giornataCalSel)!
-                  return (
-                    <CalendarioCampo key={c.id}
-                      campo={c} giornata={giornata}
-                      slotOrario={getSlotOrario(c.id, giornataCalSel)}
-                      items={buildItems(c.id, giornataCalSel)}
-                      durata={torneo.durata_partita_minuti ?? 20}
-                      durataElim={torneo.durata_partita_eliminazione_minuti ?? 20}
-                      tempoTecnico={torneo.tempo_tecnico_minuti ?? 5}
-                      campi={campi}
-                      onReorder={items => handleReorder(c.id, giornataCalSel, items)}
-                      onAddPausa={tipo => addPausa(c.id, giornataCalSel, tipo)}
-                      onDeletePausa={deletePausa}
-                      onUpdatePausa={updatePausa}
-                      onCampoChange={handleCampoChange}/>
-                  )
-                })}
-              </div>
+              {(() => {
+                const giornata = giornate.find(g => g.id === giornataCalSel)!
+                const slotOrari: Record<string,string> = {}
+                campi.forEach(cc => { slotOrari[cc.id] = getSlotOrario(cc.id, giornataCalSel) })
+                const itemsPerCampo: Record<string,CalendarioItem[]> = {}
+                campi.forEach(cc => { itemsPerCampo[cc.id] = buildItems(cc.id, giornataCalSel) })
+                return (
+                  <CalendarioBoard
+                    campi={campi} giornata={giornata}
+                    slotOrari={slotOrari}
+                    itemsPerCampo={itemsPerCampo}
+                    durata={torneo.durata_partita_minuti ?? 20}
+                    durataElim={torneo.durata_partita_eliminazione_minuti ?? 20}
+                    tempoTecnico={torneo.tempo_tecnico_minuti ?? 5}
+                    onReorder={handleReorder}
+                    onMoveCampo={handleCampoChange}
+                    onAddPausa={(campoId, tipo) => addPausa(campoId, giornataCalSel, tipo)}
+                    onDeletePausa={deletePausa}
+                    onUpdatePausa={updatePausa}/>
+                )
+              })()}
             </>
           )}
         </div>

@@ -3,7 +3,7 @@ export type Torneo = {
   admin_id: string
   nome: string
   slug: string
-  tipo: 'gironi_eliminazione' | 'campionato_eliminazione'
+  tipo: 'gironi_eliminazione' | 'campionato_eliminazione' | 'solo_campionato'
   stato: 'bozza' | 'attivo' | 'concluso'
   colore_primario: string
   colore_secondario: string
@@ -92,7 +92,7 @@ export type Partita = {
   campo_id: string | null
   girone_id: string | null
   giornata_id: string | null
-  fase: 'girone' | 'campionato' | 'quarti' | 'semifinale' | 'finale' | 'terzo_posto'
+  fase: 'girone' | 'campionato' | 'quarti' | 'semifinale' | 'finale' | 'terzo_posto' | 'solo_campionato'
   girone: string | null
   data_ora: string | null
   orario_calcolato: string | null
@@ -154,32 +154,16 @@ export function generaRoundRobin(squadre: Squadra[]): [Squadra, Squadra][] {
   return pairs
 }
 
-// Distribuisce partite tra più campi in modo alternato (round-robin sui campi)
-// Rispetta anche il vincolo interleaved: nessuna squadra gioca 2 volte di fila
+// Distribuisce partite uniformemente tra più campi (round-robin)
+// Ogni campo riceve lo stesso numero di partite ±1
 export function distribuisciSuCampi(
   pairs: [Squadra, Squadra][],
   campoIds: string[]
 ): { pair: [Squadra, Squadra]; campo_id: string }[] {
-  if (campoIds.length <= 1) {
-    return pairs.map(pair => ({ pair, campo_id: campoIds[0] ?? '' }))
-  }
-  // Assegna in modo alternato per campo, rispettando interleaved
-  const result: { pair: [Squadra, Squadra]; campo_id: string }[] = []
-  const perCampo: [Squadra, Squadra][][] = campoIds.map(() => [])
-  // Distribuisce round-robin sulle coppie ordinate
-  pairs.forEach((pair, i) => {
-    perCampo[i % campoIds.length].push(pair)
-  })
-  // Ricostruisce la lista interleaved per campo
-  const maxLen = Math.max(...perCampo.map(p => p.length))
-  for (let i = 0; i < maxLen; i++) {
-    for (let c = 0; c < campoIds.length; c++) {
-      if (perCampo[c][i]) {
-        result.push({ pair: perCampo[c][i], campo_id: campoIds[c] })
-      }
-    }
-  }
-  return result
+  if (campoIds.length === 0) return pairs.map(pair => ({ pair, campo_id: '' }))
+  if (campoIds.length === 1) return pairs.map(pair => ({ pair, campo_id: campoIds[0] }))
+  // Assegna round-robin: partita 0→campo 0, partita 1→campo 1, partita 2→campo 0, ecc.
+  return pairs.map((pair, i) => ({ pair, campo_id: campoIds[i % campoIds.length] }))
 }
 
 export function generaCalendarioInterleaved(pairs: [Squadra, Squadra][]): [Squadra, Squadra][] {

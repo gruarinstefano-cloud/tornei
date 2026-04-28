@@ -160,6 +160,7 @@ export default function ImpostazioniTab({
             <select value={torneo.tipo} onChange={e => onTorneoChange({ ...torneo, tipo: e.target.value as any })} className={inp}>
               <option value="gironi_eliminazione">Gironi + Eliminazione</option>
               <option value="campionato_eliminazione">Campionato + Eliminazione</option>
+              <option value="solo_campionato">Solo Campionato</option>
             </select>
           </div>
           <div>
@@ -220,6 +221,7 @@ export default function ImpostazioniTab({
             </select>
           </div>
         </div>
+        {torneo.tipo !== 'solo_campionato' && (
         <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
           <input type="checkbox" id="finale3" checked={torneo.finale_terzo_posto ?? false}
             onChange={e => onTorneoChange({ ...torneo, finale_terzo_posto: e.target.checked })}
@@ -228,6 +230,7 @@ export default function ImpostazioniTab({
             Abilita finale 3°/4° posto
           </label>
         </div>
+        )}
       </Section>
 
       {/* ===== GIORNATE ===== */}
@@ -310,9 +313,9 @@ export default function ImpostazioniTab({
       {/* ===== GIRONI ===== */}
       {!isNuovo && (
         <Section title="Gironi">
-          {torneo.tipo === 'campionato_eliminazione' ? (
+          {(torneo.tipo === 'campionato_eliminazione' || torneo.tipo === 'solo_campionato') ? (
             <div className="bg-blue-50 border border-blue-200 rounded-lg px-3 py-2 text-sm text-blue-700">
-              In modalità <strong>Campionato + Eliminazione</strong> c'è un unico girone. Aggiungi direttamente le squadre nella sezione Squadre.
+              In modalità <strong>Campionato</strong> c'è un unico girone. Aggiungi direttamente le squadre nella sezione Squadre.
             </div>
           ) : (
           <>
