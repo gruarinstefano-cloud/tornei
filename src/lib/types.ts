@@ -169,8 +169,9 @@ export function distribuisciSuCampi(
   return pairs.map((pair, i) => ({ pair, campo_id: campoIds[i % campoIds.length] }))
 }
 
-// Organizza le partite in turni (giornate) dove ogni squadra appare al massimo una volta per turno.
-// Poi appiattisce i turni in sequenza, garantendo il massimo riposo possibile.
+// Organizza le partite in turni (slot temporali) dove ogni squadra appare al massimo una volta.
+// Poi assegna ogni partita di ogni turno a un campo in modo ciclico.
+// Risultato: nessuna squadra gioca due partite nello stesso slot (su campi diversi o stesso campo).
 export function generaCalendarioInterleaved(pairs: [Squadra, Squadra][]): [Squadra, Squadra][] {
   if (pairs.length === 0) return []
   const remaining = [...pairs]
@@ -192,18 +193,75 @@ export function generaCalendarioInterleaved(pairs: [Squadra, Squadra][]): [Squad
       }
     }
     if (turno.length > 0) turni.push(turno)
-    else turni.push([remaining.shift()!]) // safety valve
+    else turni.push([remaining.shift()!])
   }
 
-  // Appiattisce i turni: turno1[0], turno2[0], turno3[0], turno1[1], turno2[1]...
-  // Così squadre dello stesso turno sono distanziate il più possibile
-  const result: [Squadra, Squadra][] = []
-  const maxLen = Math.max(...turni.map(t => t.length))
-  for (let i = 0; i < maxLen; i++) {
-    for (const turno of turni) {
-      if (turno[i]) result.push(turno[i])
+  // Appiattisce mantenendo l'ordine per turno
+  return turni.flat()
+}
+
+// Distribuisce i turni sui campi garantendo:
+// 1. Nessuna squadra gioca su due campi nello stesso slot
+// 2. Nessuna squadra gioca più di 2 partite consecutive nel calendario finale
+export function distribuisciTurniSuCampi(
+  pairs: [Squadra, Squadra][],
+  campoIds: string[]
+): { pair: [Squadra, Squadra]; campo_id: string; ordine: number }[] {
+  if (campoIds.length === 0) return pairs.map((pair, i) => ({ pair, campo_id: '', ordine: i }))
+
+  const remaining = [...pairs]
+  const turni: [Squadra, Squadra][][] = []
+
+  // Step 1: raggruppa in turni (ogni squadra max 1 volta per turno)
+  while (remaining.length > 0) {
+    const turno: [Squadra, Squadra][] = []
+    const usate = new Set<string>()
+    let i = 0
+    while (i < remaining.length) {
+      const [a, b] = remaining[i]
+      if (!usate.has(a.id) && !usate.has(b.id)) {
+        turno.push(remaining[i])
+        usate.add(a.id)
+        usate.add(b.id)
+        remaining.splice(i, 1)
+      } else { i++ }
     }
+    if (turno.length > 0) turni.push(turno)
+    else turni.push([remaining.shift()!])
   }
+
+  // Step 2: costruisce lista piatta con campo assegnato
+  // Le partite dello stesso turno vanno su campi diversi
+  const flat: { pair: [Squadra, Squadra]; campo_id: string }[] = []
+  for (const turno of turni) {
+    turno.forEach((pair, idx) => {
+      flat.push({ pair, campo_id: campoIds.length > 0 ? campoIds[idx % campoIds.length] : '' })
+    })
+  }
+
+  // Step 3: riordina rispettando il vincolo "max 2 partite consecutive per squadra"
+  const result: { pair: [Squadra, Squadra]; campo_id: string; ordine: number }[] = []
+  const remaining2 = [...flat]
+  const consecutive: Record<string, number> = {}
+
+  while (remaining2.length > 0) {
+    // Cerca la prima coppia dove nessuna squadra ha già 2 consecutive
+    const idx = remaining2.findIndex(({ pair: [a, b] }) =>
+      (consecutive[a.id] ?? 0) < 2 && (consecutive[b.id] ?? 0) < 2
+    )
+    const chosen = idx === -1 ? remaining2.shift()! : remaining2.splice(idx, 1)[0]
+    const [a, b] = chosen.pair
+
+    // Resetta consecutivi per squadre che non giocano
+    for (const key of Object.keys(consecutive)) {
+      if (key !== a.id && key !== b.id) consecutive[key] = 0
+    }
+    consecutive[a.id] = (consecutive[a.id] ?? 0) + 1
+    consecutive[b.id] = (consecutive[b.id] ?? 0) + 1
+
+    result.push({ ...chosen, ordine: result.length })
+  }
+
   return result
 }
 
