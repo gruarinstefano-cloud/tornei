@@ -7,18 +7,20 @@ import LogoSquadra from './LogoSquadra'
 type Props = {
   campo: Campo
   giornata: Giornata
-  slotOrario: string          // HH:MM orario inizio per questo campo in questa giornata
+  slotOrario: string
   items: CalendarioItem[]
   durata: number
   durataElim: number
   tempoTecnico: number
+  campi: Campo[]
   onReorder: (items: CalendarioItem[]) => void
   onAddPausa: (tipo: 'blocco' | 'separatore') => void
   onDeletePausa: (id: string) => void
   onUpdatePausa: (id: string, u: Partial<Pausa>) => void
+  onCampoChange: (partitaId: string, campoId: string) => void
 }
 
-export default function CalendarioCampo({ campo, giornata, slotOrario, items, durata, durataElim, tempoTecnico, onReorder, onAddPausa, onDeletePausa, onUpdatePausa }: Props) {
+export default function CalendarioCampo({ campo, giornata, slotOrario, items, durata, durataElim, tempoTecnico, campi, onReorder, onAddPausa, onDeletePausa, onUpdatePausa, onCampoChange }: Props) {
   const [dragIdx, setDragIdx] = useState<number|null>(null)
   const [overIdx, setOverIdx] = useState<number|null>(null)
   const dragItem = useRef<number|null>(null)
@@ -63,7 +65,7 @@ export default function CalendarioCampo({ campo, giornata, slotOrario, items, du
               className={`transition-all ${dragIdx===i ? 'opacity-40' : ''} ${overIdx===i && dragIdx!==i ? 'border-t-2 border-blue-400' : ''}`}
               style={{ cursor: 'grab' }}>
               {item.kind === 'partita'
-                ? <PartitaSlot p={item.data} orario={orario ?? undefined}/>
+                ? <PartitaSlot p={item.data} orario={orario ?? undefined} campi={campi} onCampoChange={cid => onCampoChange(item.data.id, cid)}/>
                 : <PausaSlot p={item.data} onDelete={() => onDeletePausa(item.data.id)} onUpdate={u => onUpdatePausa(item.data.id, u)}/>
               }
             </div>
@@ -85,7 +87,11 @@ export default function CalendarioCampo({ campo, giornata, slotOrario, items, du
   )
 }
 
-function PartitaSlot({ p, orario }: { p: Partita; orario?: Date }) {
+function PartitaSlot({ p, orario, campi, onCampoChange }: {
+  p: Partita; orario?: Date
+  campi?: import('@/lib/types').Campo[]
+  onCampoChange?: (campoId: string) => void
+}) {
   return (
     <div className="flex items-center gap-2 px-3 py-2.5 hover:bg-gray-50 select-none">
       <span className="text-gray-300 text-sm cursor-grab flex-shrink-0">⠿</span>
@@ -103,6 +109,19 @@ function PartitaSlot({ p, orario }: { p: Partita; orario?: Date }) {
         <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={18}/>
         <span className="text-sm font-medium truncate">{(p.squadra_ospite as any)?.nome ?? '–'}</span>
       </div>
+      {campi && onCampoChange && (
+        <select
+          value={p.campo_id || ''}
+          onChange={e => onCampoChange(e.target.value)}
+          onClick={e => e.stopPropagation()}
+          className="text-xs border border-gray-200 rounded px-1 py-0.5 text-gray-500 flex-shrink-0 max-w-[90px]"
+          style={{ cursor: 'pointer' }}>
+          <option value="">Nessun campo</option>
+          {campi.map(c => (
+            <option key={c.id} value={c.id}>{c.nome}</option>
+          ))}
+        </select>
+      )}
     </div>
   )
 }

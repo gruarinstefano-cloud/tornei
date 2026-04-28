@@ -130,6 +130,12 @@ export default function AdminTorneoPage() {
     }))
   }
 
+  async function handleCampoChange(partitaId: string, nuovoCampoId: string) {
+    const sb = createClient()
+    await sb.from('partite').update({ campo_id: nuovoCampoId || null }).eq('id', partitaId)
+    setPartite(prev => prev.map(p => p.id === partitaId ? { ...p, campo_id: nuovoCampoId || null } : p))
+  }
+
   async function addPausa(campoId: string, giornataId: string, tipo: 'blocco'|'separatore') {
     const sb = createClient()
     const maxOrd = Math.max(0, ...pause.filter(p => p.campo_id===campoId && p.giornata_id===giornataId).map(p => p.ordine_calendario)) + 1
@@ -162,9 +168,11 @@ export default function AdminTorneoPage() {
     const giornataDefault = giornate.find(g => g.id === giornataCalSel)?.id ?? giornate[0]?.id ?? null
 
     if (gironi.length === 0) {
+      // Modalità campionato: assegna automaticamente il primo campo disponibile
+      const campoCampionato = campi[0]?.id ?? null
       generaCalendarioInterleaved(generaRoundRobin(squadre)).forEach(([a,b]) => toInsert.push({
         torneo_id: id, squadra_casa_id: a.id, squadra_ospite_id: b.id,
-        campo_id: null, girone_id: null, giornata_id: giornataDefault,
+        campo_id: campoCampionato, girone_id: null, giornata_id: giornataDefault,
         fase: 'campionato', girone: null, giocata: false, ordine_calendario: ordine++
       }))
     } else {
@@ -428,10 +436,12 @@ export default function AdminTorneoPage() {
                       durata={torneo.durata_partita_minuti ?? 20}
                       durataElim={torneo.durata_partita_eliminazione_minuti ?? 20}
                       tempoTecnico={torneo.tempo_tecnico_minuti ?? 5}
+                      campi={campi}
                       onReorder={items => handleReorder(c.id, giornataCalSel, items)}
                       onAddPausa={tipo => addPausa(c.id, giornataCalSel, tipo)}
                       onDeletePausa={deletePausa}
-                      onUpdatePausa={updatePausa}/>
+                      onUpdatePausa={updatePausa}
+                      onCampoChange={handleCampoChange}/>
                   )
                 })}
               </div>
