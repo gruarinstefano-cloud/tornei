@@ -171,7 +171,7 @@ export default function AdminTorneoPage() {
       // Modalità campionato/solo_campionato: distribuisce uniformemente su tutti i campi disponibili
       const campiIds = campi.map(c => c.id)
       const fase = torneo.tipo === 'solo_campionato' ? 'solo_campionato' : 'campionato'
-      const pairs = generaCalendarioInterleaved(generaRoundRobin(squadre))
+      const pairs = generaCalendarioInterleaved(generaRoundRobin(squadre, torneo.andata_ritorno ?? false))
       const distribuiti = distribuisciSuCampi(pairs, campiIds)
       distribuiti.forEach(({ pair: [a, b], campo_id }) => toInsert.push({
         torneo_id: id, squadra_casa_id: a.id, squadra_ospite_id: b.id,
@@ -182,7 +182,7 @@ export default function AdminTorneoPage() {
       for (const g of gironi) {
         const sq = squadre.filter(s => s.girone_id === g.id)
         if (sq.length < 2) continue
-        const pairs = generaCalendarioInterleaved(generaRoundRobin(sq))
+        const pairs = generaCalendarioInterleaved(generaRoundRobin(sq, torneo.andata_ritorno ?? false))
         // Recupera tutti i campi del girone
         const campiIds = (g.girone_campi && g.girone_campi.length > 0)
           ? g.girone_campi.sort((a: any, b: any) => a.ordine - b.ordine).map((gc: any) => gc.campo_id)

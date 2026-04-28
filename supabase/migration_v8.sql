@@ -30,3 +30,6 @@ select id, campo_id, 0
 from public.gironi
 where campo_id is not null
 on conflict (girone_id, campo_id) do nothing;
+
+-- Aggiunge campo andata_ritorno al torneo
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS andata_ritorno boolean DEFAULT false;
