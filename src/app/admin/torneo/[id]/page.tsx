@@ -136,6 +136,23 @@ export default function AdminTorneoPage() {
     setPartite(prev => prev.map(p => p.id === partitaId ? { ...p, campo_id: nuovoCampoId || null } : p))
   }
 
+  async function resetPartite() {
+    if (!confirm('Sei sicuro? Tutte le partite generate o inserite manualmente verranno eliminate.')) return
+    const sb = createClient()
+    await sb.from('partite').delete().eq('torneo_id', id)
+    await sb.from('pause').delete().eq('torneo_id', id)
+    setPartite([])
+    setPause([])
+    showMsg('Partite e pause eliminate!')
+  }
+
+  async function renameCampo(campoId: string, nuovoNome: string) {
+    if (!nuovoNome.trim()) return
+    await createClient().from('campi').update({ nome: nuovoNome }).eq('id', campoId)
+    setCampi(prev => prev.map(c => c.id === campoId ? { ...c, nome: nuovoNome } : c))
+    showMsg('Campo rinominato!')
+  }
+
   async function addPausa(campoId: string, giornataId: string, tipo: 'blocco'|'separatore') {
     const sb = createClient()
     const maxOrd = Math.max(0, ...pause.filter(p => p.campo_id===campoId && p.giornata_id===giornataId).map(p => p.ordine_calendario)) + 1
@@ -197,7 +214,10 @@ export default function AdminTorneoPage() {
     }
 
     if (toInsert.length === 0) { showMsg('Nessuna coppia. Verifica i gironi.', 'err'); setGenerando(false); return }
+    // Elimina TUTTE le partite della fase girone/campionato esistenti prima di rigenerare
     await sb.from('partite').delete().eq('torneo_id', id).in('fase', ['girone','campionato','solo_campionato'])
+    // Piccola pausa per assicurare la cancellazione
+    await new Promise(r => setTimeout(r, 300))
     const { data, error } = await sb.from('partite').insert(toInsert)
       .select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)')
     if (error) showMsg('Errore: ' + error.message, 'err')
@@ -338,6 +358,7 @@ export default function AdminTorneoPage() {
           onGironiChange={setGironi}
           onCampiChange={setCampi}
           onGiornateChange={setGiornate}
+          onRenameCampo={renameCampo}
           onSave={saveTorneo} saving={saving}/>
       )}
 
@@ -386,6 +407,10 @@ export default function AdminTorneoPage() {
               className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700 disabled:opacity-50">
               {generando ? 'Generando...' : '⚡ Genera partite automaticamente'}
             </button>
+            <button onClick={resetPartite}
+              className="px-4 py-2 border border-red-200 text-red-500 rounded-lg text-sm font-medium hover:bg-red-50 transition">
+              🗑 Reset partite
+            </button>
             {giornate.length > 0 && (
               <select value={giornataCalSel} onChange={e => setGiornataCalSel(e.target.value)}
                 className="px-3 py-2 border border-gray-300 rounded-lg text-sm">
@@ -430,11 +455,16 @@ export default function AdminTorneoPage() {
               })()}
 
               {(() => {
-                const giornata = giornate.find(g => g.id === giornataCalSel)!
+                const giornata = giornate.find(g => g.id === giornataCalSel)
+                if (!giornata) return (
+                  <div className="bg-amber-50 border border-amber-200 rounded-xl px-4 py-4 text-sm text-amber-800">
+                    Aggiungi almeno una <strong>Giornata</strong> nelle Impostazioni per visualizzare il calendario.
+                  </div>
+                )
                 const slotOrari: Record<string,string> = {}
-                campi.forEach(cc => { slotOrari[cc.id] = getSlotOrario(cc.id, giornataCalSel) })
+                campi.forEach(cc => { slotOrari[cc.id] = getSlotOrario(cc.id, giornata.id) })
                 const itemsPerCampo: Record<string,CalendarioItem[]> = {}
-                campi.forEach(cc => { itemsPerCampo[cc.id] = buildItems(cc.id, giornataCalSel) })
+                campi.forEach(cc => { itemsPerCampo[cc.id] = buildItems(cc.id, giornata.id) })
                 return (
                   <CalendarioBoard
                     campi={campi} giornata={giornata}
@@ -445,7 +475,7 @@ export default function AdminTorneoPage() {
                     tempoTecnico={torneo.tempo_tecnico_minuti ?? 5}
                     onReorder={handleReorder}
                     onMoveCampo={handleCampoChange}
-                    onAddPausa={(campoId, tipo) => addPausa(campoId, giornataCalSel, tipo)}
+                    onAddPausa={(campoId, tipo) => addPausa(campoId, giornata.id, tipo)}
                     onDeletePausa={deletePausa}
                     onUpdatePausa={updatePausa}/>
                 )
