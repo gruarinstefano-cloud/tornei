@@ -17,6 +17,7 @@ export type Torneo = {
   tempo_tecnico_minuti: number
   data_inizio: string | null
   orario_inizio_default: string
+  andata_ritorno: boolean
   token_live: string | null
   created_at: string
 }
@@ -146,11 +147,13 @@ export function calcolaClassifica(squadre: Squadra[], partite: Partita[], girone
   }).sort((a, b) => b.pt-a.pt || (b.gf-b.gs)-(a.gf-a.gs) || b.gf-a.gf)
 }
 
-export function generaRoundRobin(squadre: Squadra[]): [Squadra, Squadra][] {
+export function generaRoundRobin(squadre: Squadra[], andataRitorno = false): [Squadra, Squadra][] {
   const pairs: [Squadra, Squadra][] = []
   for (let i=0; i<squadre.length; i++)
-    for (let j=i+1; j<squadre.length; j++)
+    for (let j=i+1; j<squadre.length; j++) {
       pairs.push([squadre[i], squadre[j]])
+      if (andataRitorno) pairs.push([squadre[j], squadre[i]])
+    }
   return pairs
 }
 
