@@ -169,14 +169,40 @@ export function distribuisciSuCampi(
   return pairs.map((pair, i) => ({ pair, campo_id: campoIds[i % campoIds.length] }))
 }
 
+// Organizza le partite in turni (giornate) dove ogni squadra appare al massimo una volta per turno.
+// Poi appiattisce i turni in sequenza, garantendo il massimo riposo possibile.
 export function generaCalendarioInterleaved(pairs: [Squadra, Squadra][]): [Squadra, Squadra][] {
-  const result: [Squadra, Squadra][] = []
+  if (pairs.length === 0) return []
   const remaining = [...pairs]
+  const turni: [Squadra, Squadra][][] = []
+
   while (remaining.length > 0) {
-    const last = result[result.length-1]
-    const lastIds = last ? new Set([last[0].id, last[1].id]) : new Set<string>()
-    const idx = remaining.findIndex(([a,b]) => !lastIds.has(a.id) && !lastIds.has(b.id))
-    result.push(idx === -1 ? remaining.shift()! : remaining.splice(idx,1)[0])
+    const turno: [Squadra, Squadra][] = []
+    const usate = new Set<string>()
+    let i = 0
+    while (i < remaining.length) {
+      const [a, b] = remaining[i]
+      if (!usate.has(a.id) && !usate.has(b.id)) {
+        turno.push(remaining[i])
+        usate.add(a.id)
+        usate.add(b.id)
+        remaining.splice(i, 1)
+      } else {
+        i++
+      }
+    }
+    if (turno.length > 0) turni.push(turno)
+    else turni.push([remaining.shift()!]) // safety valve
+  }
+
+  // Appiattisce i turni: turno1[0], turno2[0], turno3[0], turno1[1], turno2[1]...
+  // Così squadre dello stesso turno sono distanziate il più possibile
+  const result: [Squadra, Squadra][] = []
+  const maxLen = Math.max(...turni.map(t => t.length))
+  for (let i = 0; i < maxLen; i++) {
+    for (const turno of turni) {
+      if (turno[i]) result.push(turno[i])
+    }
   }
   return result
 }
