@@ -5,7 +5,7 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { createClient } from '@/lib/supabase'
 import type { Torneo, Squadra, Partita, Campo, Sponsor, Girone, Pausa, CalendarioItem, Giornata, SlotCampo } from '@/lib/types'
-import { calcolaClassifica, generaRoundRobin, generaCalendarioInterleaved, distribuisciSuCampi, generaEliminatoria, formatDataBreve } from '@/lib/types'
+import { calcolaClassifica, generaRoundRobin, distribuisciTurniSuCampi, generaEliminatoria, formatDataBreve } from '@/lib/types'
 import LogoSquadra from '@/components/LogoSquadra'
 import { resizeImage } from '@/lib/imageResize'
 import LinkPrivatoTab from '@/components/LinkPrivatoTab'
@@ -188,28 +188,28 @@ export default function AdminTorneoPage() {
       // Modalità campionato/solo_campionato: distribuisce uniformemente su tutti i campi disponibili
       const campiIds = campi.map(c => c.id)
       const fase = torneo.tipo === 'solo_campionato' ? 'solo_campionato' : 'campionato'
-      const pairs = generaCalendarioInterleaved(generaRoundRobin(squadre, torneo.andata_ritorno === true))
-      const distribuiti = distribuisciSuCampi(pairs, campiIds)
-      distribuiti.forEach(({ pair: [a, b], campo_id }) => toInsert.push({
+      const pairs = generaRoundRobin(squadre, torneo.andata_ritorno === true)
+      const distribuiti = distribuisciTurniSuCampi(pairs, campiIds)
+      distribuiti.sort((a,b) => a.ordine - b.ordine).forEach(({ pair: [a, b], campo_id, ordine: ord }) => toInsert.push({
         torneo_id: id, squadra_casa_id: a.id, squadra_ospite_id: b.id,
         campo_id: campo_id || null, girone_id: null, giornata_id: giornataDefault,
-        fase, girone: null, giocata: false, ordine_calendario: ordine++
+        fase, girone: null, giocata: false, ordine_calendario: ord
       }))
     } else {
       for (const g of gironi) {
         const sq = squadre.filter(s => s.girone_id === g.id)
         if (sq.length < 2) continue
-        const pairs = generaCalendarioInterleaved(generaRoundRobin(sq, torneo.andata_ritorno === true))
-        // Recupera tutti i campi del girone
-        const campiIds = (g.girone_campi && g.girone_campi.length > 0)
-          ? g.girone_campi.sort((a: any, b: any) => a.ordine - b.ordine).map((gc: any) => gc.campo_id)
-          : g.campo_id ? [g.campo_id] : [null]
-        const distribuiti = distribuisciSuCampi(pairs, campiIds.filter(Boolean) as string[])
-        distribuiti.forEach(({ pair: [a, b], campo_id }) => toInsert.push({
+        const pairsGirone = generaRoundRobin(sq, torneo.andata_ritorno === true)
+        const campiIdsGirone = (g.girone_campi && g.girone_campi.length > 0)
+          ? g.girone_campi.sort((a: any, b: any) => a.ordine - b.ordine).map((gc: any) => gc.campo_id).filter(Boolean) as string[]
+          : g.campo_id ? [g.campo_id] : []
+        const distribuitiGirone = distribuisciTurniSuCampi(pairsGirone, campiIdsGirone)
+        distribuitiGirone.sort((a,b) => a.ordine - b.ordine).forEach(({ pair: [a, b], campo_id, ordine: ord }) => toInsert.push({
           torneo_id: id, squadra_casa_id: a.id, squadra_ospite_id: b.id,
           campo_id: campo_id || null, girone_id: g.id, giornata_id: giornataDefault,
-          fase: 'girone', girone: g.nome, giocata: false, ordine_calendario: ordine++
+          fase: 'girone', girone: g.nome, giocata: false, ordine_calendario: ordine + ord
         }))
+        ordine += distribuitiGirone.length
       }
     }
 
