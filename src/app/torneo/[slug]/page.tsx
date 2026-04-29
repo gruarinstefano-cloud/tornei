@@ -206,7 +206,7 @@ export default function TorneoPage() {
                                   {orario && <span className="text-xs font-mono font-semibold text-blue-600">{formatOra(orario)}</span>}
                                   {p.giocata && <span className="text-xs text-green-600">✓</span>}
                                   {p.girone && <span className="text-xs text-gray-400">Girone {p.girone}</span>}
-                                  {p.fase !== 'girone' && p.fase !== 'campionato' && (
+                                  {p.fase !== 'girone' && p.fase !== 'campionato' && p.fase !== 'solo_campionato' && (
                                     <span className="text-xs text-purple-500 capitalize">{p.fase}</span>
                                   )}
                                 </div>
