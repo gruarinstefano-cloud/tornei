@@ -147,7 +147,7 @@ export default function TorneoPage() {
                   </table>
                 </div>
               )
-            }))}
+            })}
             )}
           </div>
         )}
