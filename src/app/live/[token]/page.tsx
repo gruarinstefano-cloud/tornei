@@ -30,7 +30,7 @@ export default function LivePage() {
         setTorneo(t)
         const [sq, pa, ca, gi] = await Promise.all([
           sb.from('squadre').select('*').eq('torneo_id', t.id),
-          sb.from('partite').select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(nome)').eq('torneo_id', t.id).order('data_ora', { nullsFirst: false }),
+          sb.from('partite').select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(nome)').eq('torneo_id', t.id).order('ordine_calendario', { nullsFirst: false }),
           sb.from('campi').select('*').eq('torneo_id', t.id).order('ordine'),
           sb.from('gironi').select('*').eq('torneo_id', t.id).order('ordine'),
         ])
@@ -123,7 +123,7 @@ export default function LivePage() {
   )
 
   const primary = torneo!.colore_primario || '#1e40af'
-  const partiteGirone = partite.filter(p => ['girone','campionato'].includes(p.fase))
+  const partiteGirone = partite.filter(p => ['girone','campionato','solo_campionato'].includes(p.fase))
   const partiteElim = partite.filter(p => ['quarti','semifinale','finale','terzo_posto'].includes(p.fase))
   const gironiCompleti = partiteGirone.length > 0 && partiteGirone.every(p => p.giocata)
 
