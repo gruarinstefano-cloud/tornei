@@ -8,7 +8,7 @@ import LogoSquadra from '@/components/LogoSquadra'
 import BannerTorneo from '@/components/BannerTorneo'
 import Link from 'next/link'
 
-type Tab = 'gironi' | 'partite' | 'tabellone' | 'info'
+type Tab = 'gironi' | 'partite' | 'tabellone' | 'squadre' | 'info'
 
 export default function TorneoPage() {
   const { slug } = useParams<{ slug: string }>()
@@ -21,6 +21,7 @@ export default function TorneoPage() {
   const [pause, setPause] = useState<Pausa[]>([])
   const [gironiObj, setGironiObj] = useState<any[]>([])
   const [tab, setTab] = useState<Tab>('gironi')
+  const [squadraSelId, setSquadraSelId] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -77,7 +78,7 @@ export default function TorneoPage() {
       {/* Tabs */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 flex gap-1 overflow-x-auto">
-          {([['gironi', primaTabLabel],['partite','Partite'],...(!isSoloCampionato ? [['tabellone','Fase eliminatoria']] : []),['info','Info']] as [Tab,string][]).map(([key,label]) => (
+          {([['gironi', primaTabLabel],['partite','Partite'],['squadre','Squadre'],...(!isSoloCampionato ? [['tabellone','Fase eliminatoria']] : []),['info','Info']] as [Tab,string][]).map(([key,label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition ${tab===key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               style={tab===key ? { borderColor: primary, color: primary } : {}}>
@@ -278,6 +279,64 @@ export default function TorneoPage() {
           </div>
         )}
 
+        {/* SQUADRE */}
+        {tab === 'squadre' && (
+          <div>
+            {squadraSelId ? (
+              <SquadraDettaglio
+                squadraId={squadraSelId}
+                squadre={squadre}
+                gironi={gironiObj}
+                partite={partite}
+                primary={primary}
+                isSoloCampionato={isSoloCampionato}
+                onBack={() => setSquadraSelId(null)}/>
+            ) : (
+              <div>
+                {/* Raggruppa per girone */}
+                {gironiObj.length > 0 ? (
+                  <div className="space-y-5">
+                    {gironiObj.map((g: any) => (
+                      <div key={g.id}>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 px-1">
+                          Girone {g.nome}
+                        </h3>
+                        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                          {squadre.filter(s => s.girone_id === g.id).map(s => (
+                            <SquadraCard key={s.id} squadra={s} primary={primary}
+                              onClick={() => setSquadraSelId(s.id)}/>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                    {squadre.filter(s => !s.girone_id).length > 0 && (
+                      <div>
+                        <h3 className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-3 px-1">Altre squadre</h3>
+                        <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                          {squadre.filter(s => !s.girone_id).map(s => (
+                            <SquadraCard key={s.id} squadra={s} primary={primary}
+                              onClick={() => setSquadraSelId(s.id)}/>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                    {squadre.map(s => (
+                      <SquadraCard key={s.id} squadra={s} primary={primary}
+                        onClick={() => setSquadraSelId(s.id)}/>
+                    ))}
+                  </div>
+                )}
+                {squadre.length === 0 && (
+                  <div className="text-center py-12 text-gray-400">Nessuna squadra ancora registrata</div>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
         {/* INFO */}
         {tab === 'info' && (
           <div className="space-y-4">
@@ -308,6 +367,230 @@ export default function TorneoPage() {
         )}
 
       </div>
+    </div>
+  )
+}
+
+
+function SquadraCard({ squadra, primary, onClick }: {
+  squadra: any; primary: string; onClick: () => void
+}) {
+  return (
+    <button onClick={onClick}
+      className="bg-white rounded-xl border border-gray-200 p-4 flex items-center gap-3 hover:shadow-md hover:border-gray-300 transition text-left w-full">
+      <LogoSquadra squadra={squadra} size={40}/>
+      <div className="min-w-0">
+        <div className="font-semibold text-gray-800 text-sm truncate">{squadra.nome}</div>
+        {squadra.girone && (
+          <div className="text-xs text-gray-400 mt-0.5">Girone {squadra.girone}</div>
+        )}
+      </div>
+      <span className="ml-auto text-gray-300 text-sm flex-shrink-0">›</span>
+    </button>
+  )
+}
+
+function SquadraDettaglio({ squadraId, squadre, gironi, partite, primary, isSoloCampionato, onBack }: {
+  squadraId: string; squadre: any[]; gironi: any[]; partite: any[]
+  primary: string; isSoloCampionato: boolean; onBack: () => void
+}) {
+  const squadra = squadre.find(s => s.id === squadraId)
+  if (!squadra) return null
+
+  // Partite di questa squadra
+  const miePartite = partite.filter(p =>
+    p.squadra_casa_id === squadraId || p.squadra_ospite_id === squadraId
+  ).sort((a: any, b: any) => a.ordine_calendario - b.ordine_calendario)
+
+  const fasiGirone = ['girone','campionato','solo_campionato']
+  const fasiElim = ['quarti','semifinale','finale','terzo_posto']
+
+  const partiteGirone = miePartite.filter(p => fasiGirone.includes(p.fase))
+  const partiteElimSquadra = miePartite.filter(p => fasiElim.includes(p.fase))
+
+  // Classifica del girone/campionato di riferimento
+  const girone = gironi.find(g => g.id === squadra.girone_id)
+  const squadreGirone = girone
+    ? squadre.filter(s => s.girone_id === girone.id)
+    : squadre
+  const partiteRif = girone
+    ? partite.filter(p => p.girone_id === girone.id)
+    : partite.filter(p => fasiGirone.includes(p.fase))
+
+  // Calcola classifica manualmente
+  const classifica = squadreGirone.map(sq => {
+    const mine = partiteRif.filter(p =>
+      p.giocata && (p.squadra_casa_id === sq.id || p.squadra_ospite_id === sq.id)
+    )
+    let v=0, par=0, s=0, gf=0, gs=0
+    mine.forEach((p: any) => {
+      const casa = p.squadra_casa_id === sq.id
+      const miei = casa ? (p.gol_casa??0) : (p.gol_ospite??0)
+      const avv  = casa ? (p.gol_ospite??0) : (p.gol_casa??0)
+      gf += miei; gs += avv
+      if (miei > avv) v++; else if (miei === avv) par++; else s++
+    })
+    return { squadra: sq, g: mine.length, v, p: par, s, gf, gs, pt: v*3+par }
+  }).sort((a: any, b: any) => b.pt - a.pt || (b.gf-b.gs)-(a.gf-a.gs) || b.gf-a.gf)
+
+  const miaPos = classifica.findIndex(s => s.squadra.id === squadraId)
+
+  // Stats personali
+  const mieStats = classifica.find(s => s.squadra.id === squadraId)
+
+  return (
+    <div>
+      {/* Back button */}
+      <button onClick={onBack} className="flex items-center gap-2 text-sm text-gray-500 hover:text-gray-700 mb-5 transition">
+        <span>←</span> <span>Tutte le squadre</span>
+      </button>
+
+      {/* Header squadra */}
+      <div className="bg-white rounded-xl border border-gray-200 p-5 flex items-center gap-4 mb-5">
+        <LogoSquadra squadra={squadra} size={56}/>
+        <div>
+          <h2 className="text-xl font-bold text-gray-900">{squadra.nome}</h2>
+          {girone && <p className="text-sm text-gray-500 mt-0.5">Girone {girone.nome}</p>}
+        </div>
+        {mieStats && (
+          <div className="ml-auto flex gap-4 text-center">
+            <div>
+              <div className="text-2xl font-bold" style={{ color: primary }}>{mieStats.pt}</div>
+              <div className="text-xs text-gray-400">punti</div>
+            </div>
+            <div className="border-l border-gray-100 pl-4">
+              <div className="text-2xl font-bold text-gray-700">{miaPos + 1}°</div>
+              <div className="text-xs text-gray-400">posizione</div>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Stats riepilogo */}
+      {mieStats && mieStats.g > 0 && (
+        <div className="grid grid-cols-4 gap-2 mb-5">
+          {[
+            { label: 'Vittorie', val: mieStats.v, color: '#16a34a' },
+            { label: 'Pareggi', val: mieStats.p, color: '#d97706' },
+            { label: 'Sconfitte', val: mieStats.s, color: '#dc2626' },
+            { label: 'Gol fatti', val: mieStats.gf, color: primary },
+          ].map(stat => (
+            <div key={stat.label} className="bg-white rounded-xl border border-gray-200 p-3 text-center">
+              <div className="text-xl font-bold" style={{ color: stat.color }}>{stat.val}</div>
+              <div className="text-xs text-gray-400 mt-0.5">{stat.label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Partite fase gironi */}
+      {partiteGirone.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+          <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100"
+            style={{ background: primary + '0a' }}>
+            {isSoloCampionato ? 'Partite' : 'Fase gironi'}
+          </div>
+          {partiteGirone.map((p: any) => (
+            <PartitaSquadraRow key={p.id} p={p} squadraId={squadraId} primary={primary}/>
+          ))}
+        </div>
+      )}
+
+      {/* Partite fase eliminatoria */}
+      {partiteElimSquadra.length > 0 && (
+        <div className="bg-white rounded-xl border border-gray-200 overflow-hidden mb-4">
+          <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100"
+            style={{ background: primary + '0a' }}>
+            Fase eliminatoria
+          </div>
+          {partiteElimSquadra.map((p: any) => (
+            <PartitaSquadraRow key={p.id} p={p} squadraId={squadraId} primary={primary}/>
+          ))}
+        </div>
+      )}
+
+      {/* Classifica girone/campionato */}
+      <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100"
+          style={{ background: primary + '0a' }}>
+          {girone ? `Classifica Girone ${girone.nome}` : 'Classifica'}
+        </div>
+        <table className="w-full text-sm">
+          <thead><tr className="border-b border-gray-50">
+            <th className="text-left px-3 py-2 text-xs text-gray-400 font-medium">Squadra</th>
+            <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">G</th>
+            <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">V</th>
+            <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">P</th>
+            <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">S</th>
+            <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">GF</th>
+            <th className="text-center px-2 py-2 text-xs text-gray-400 font-medium">Pt</th>
+          </tr></thead>
+          <tbody>
+            {classifica.map((s: any, i: number) => (
+              <tr key={s.squadra.id}
+                className={s.squadra.id === squadraId ? 'font-semibold' : ''}
+                style={s.squadra.id === squadraId ? { background: primary + '0d' } : {}}>
+                <td className="px-3 py-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-xs w-4 text-center text-gray-400">{i+1}</span>
+                    <LogoSquadra squadra={s.squadra} size={20}/>
+                    <span className="truncate">{s.squadra.nome}</span>
+                    {s.squadra.id === squadraId && (
+                      <span className="text-xs px-1.5 py-0.5 rounded text-white flex-shrink-0"
+                        style={{ background: primary, fontSize: 10 }}>TU</span>
+                    )}
+                  </div>
+                </td>
+                <td className="text-center px-1 py-2 text-gray-600">{s.g}</td>
+                <td className="text-center px-1 py-2 text-gray-600">{s.v}</td>
+                <td className="text-center px-1 py-2 text-gray-600">{s.p}</td>
+                <td className="text-center px-1 py-2 text-gray-600">{s.s}</td>
+                <td className="text-center px-1 py-2 text-gray-600">{s.gf}</td>
+                <td className="text-center px-2 py-2 font-bold" style={{ color: primary }}>{s.pt}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  )
+}
+
+function PartitaSquadraRow({ p, squadraId, primary }: {
+  p: any; squadraId: string; primary: string
+}) {
+  const isCasa = p.squadra_casa_id === squadraId
+  const avversario = isCasa ? p.squadra_ospite : p.squadra_casa
+  const golMiei = isCasa ? p.gol_casa : p.gol_ospite
+  const golAvv = isCasa ? p.gol_ospite : p.gol_casa
+  const vinto = p.giocata && (golMiei ?? 0) > (golAvv ?? 0)
+  const pareggio = p.giocata && (golMiei ?? 0) === (golAvv ?? 0)
+  const perso = p.giocata && (golMiei ?? 0) < (golAvv ?? 0)
+
+  return (
+    <div className="flex items-center gap-3 px-4 py-3 border-b border-gray-50 last:border-0">
+      {/* Esito */}
+      {p.giocata ? (
+        <span className={`text-xs font-bold w-5 h-5 rounded flex items-center justify-center flex-shrink-0 text-white ${vinto ? 'bg-green-500' : pareggio ? 'bg-gray-400' : 'bg-red-500'}`}>
+          {vinto ? 'V' : pareggio ? 'P' : 'S'}
+        </span>
+      ) : (
+        <span className="text-xs w-5 h-5 rounded border border-gray-200 flex items-center justify-center flex-shrink-0 text-gray-400">–</span>
+      )}
+      {/* Casa/Trasferta */}
+      <span className="text-xs text-gray-400 w-4 flex-shrink-0">{isCasa ? 'C' : 'T'}</span>
+      {/* Avversario */}
+      <LogoSquadra squadra={avversario ?? { nome:'?', logo_url:null }} size={24}/>
+      <span className="flex-1 text-sm font-medium text-gray-800 truncate">{avversario?.nome ?? '–'}</span>
+      {/* Risultato */}
+      {p.giocata ? (
+        <span className="text-sm font-bold flex-shrink-0"
+          style={{ color: vinto ? '#16a34a' : perso ? '#dc2626' : '#6b7280' }}>
+          {golMiei}–{golAvv}
+        </span>
+      ) : (
+        <span className="text-xs text-gray-400 flex-shrink-0">da giocare</span>
+      )}
     </div>
   )
 }
