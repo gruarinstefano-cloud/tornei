@@ -173,6 +173,20 @@ export default function ImpostazioniTab({
             </select>
           </div>
         </div>
+        <Section title="Info pubblica">
+          <div>
+            <label className={lbl}>Luogo / sede dell'evento</label>
+            <input value={torneo.luogo || ''} onChange={e => onTorneoChange({ ...torneo, luogo: e.target.value })}
+              className={inp} placeholder="Es. Oratorio San Luigi, Via Roma 1 — Milano"/>
+          </div>
+          <div>
+            <label className={lbl}>Testo libero (regole, benvenuto, note...)</label>
+            <textarea value={torneo.info_testo || ''} onChange={e => onTorneoChange({ ...torneo, info_testo: e.target.value })}
+              className={`${inp} resize-y`} rows={5}
+              placeholder="Scrivi qui le regole del torneo, un messaggio di benvenuto o qualsiasi informazione utile per i partecipanti..."/>
+          </div>
+        </Section>
+
         <div className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg">
           <input type="checkbox" id="andataRitorno" checked={torneo.andata_ritorno ?? false}
             onChange={e => onTorneoChange({ ...torneo, andata_ritorno: e.target.checked })}

@@ -18,6 +18,8 @@ export type Torneo = {
   data_inizio: string | null
   orario_inizio_default: string
   andata_ritorno: boolean
+  luogo: string | null
+  info_testo: string | null
   token_live: string | null
   created_at: string
 }
