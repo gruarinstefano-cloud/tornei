@@ -79,7 +79,7 @@ export default function TorneoPage() {
       {/* Tabs */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 flex gap-1 overflow-x-auto">
-          {([['gironi','Gironi'],['risultati','Risultati'],['programma','Programma'],...(!isSoloCampionato ? [['tabellone','Fase eliminatoria']] : [])] as [Tab,string][]).map(([key,label]) => (
+          {([['gironi', (torneo.tipo === 'campionato_eliminazione' || torneo.tipo === 'solo_campionato') ? 'Classifica' : 'Gironi'],['risultati','Risultati'],['programma','Programma'],...(!isSoloCampionato ? [['tabellone','Fase eliminatoria']] : [])] as [Tab,string][]).map(([key,label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition ${tab===key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               style={tab===key ? { borderColor: primary, color: primary } : {}}>
@@ -91,13 +91,24 @@ export default function TorneoPage() {
 
       <div className="max-w-4xl mx-auto px-4 py-6">
 
-        {/* GIRONI */}
+        {/* GIRONI / CLASSIFICA */}
         {tab === 'gironi' && (
           <div className="grid gap-5 md:grid-cols-2">
-            {(gironiObj.length > 0 ? gironiObj : gironiNomi.map((n: string) => ({ id: n, nome: n }))).map((g: any) => {
+            {/* Modalità campionato: classifica unica senza gironi */}
+            {(torneo.tipo === 'campionato_eliminazione' || torneo.tipo === 'solo_campionato') && gironiObj.length === 0 ? (
+              <div className="bg-white rounded-xl border border-gray-200 overflow-hidden md:col-span-2">
+                <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100"
+                  style={{ background: primary + '10' }}>
+                  Classifica
+                </div>
+                <ClassificaTable stats={calcolaClassifica(squadre, partite)} primary={primary}/>
+              </div>
+            ) : (
+            /* Modalità gironi */
+            (gironiObj.length > 0 ? gironiObj : gironiNomi.map((n: string) => ({ id: n, nome: n }))).map((g: any) => {
               const stats = gironiObj.length > 0
                 ? calcolaClassifica(squadre, partite, g.id)
-                : calcolaClassifica(squadre.filter(s => s.girone === g.nome), partite)
+                : calcolaClassifica(squadre.filter((s: any) => s.girone === g.nome), partite)
               return (
                 <div key={g.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
                   <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100"
@@ -136,7 +147,8 @@ export default function TorneoPage() {
                   </table>
                 </div>
               )
-            })}
+            }))}
+            )}
           </div>
         )}
 
@@ -302,6 +314,41 @@ export default function TorneoPage() {
         )}
       </div>
     </div>
+  )
+}
+
+function ClassificaTable({ stats, primary }: { stats: any[]; primary: string }) {
+  return (
+    <table className="w-full text-sm">
+      <thead><tr className="border-b border-gray-100">
+        <th className="text-left px-3 py-2 text-xs text-gray-400 font-medium">Squadra</th>
+        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">G</th>
+        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">V</th>
+        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">P</th>
+        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">S</th>
+        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">GF</th>
+        <th className="text-center px-2 py-2 text-xs text-gray-400 font-medium">Pt</th>
+      </tr></thead>
+      <tbody>
+        {stats.map((s: any, i: number) => (
+          <tr key={s.squadra.id} style={i < 3 ? { background: primary + '0d' } : {}}>
+            <td className="px-3 py-2">
+              <div className="flex items-center gap-2">
+                <span className="text-xs w-5 text-center font-medium" style={{ color: i < 3 ? primary : '#9ca3af' }}>{i+1}</span>
+                <LogoSquadra squadra={s.squadra} size={22}/>
+                <span className="font-medium truncate">{s.squadra.nome}</span>
+              </div>
+            </td>
+            <td className="text-center px-1 py-2 text-gray-600">{s.g}</td>
+            <td className="text-center px-1 py-2 text-gray-600">{s.v}</td>
+            <td className="text-center px-1 py-2 text-gray-600">{s.p}</td>
+            <td className="text-center px-1 py-2 text-gray-600">{s.s}</td>
+            <td className="text-center px-1 py-2 text-gray-600">{s.gf}</td>
+            <td className="text-center px-2 py-2 font-bold" style={{ color: primary }}>{s.pt}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }
 
