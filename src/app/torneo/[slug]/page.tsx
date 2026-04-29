@@ -67,9 +67,7 @@ export default function TorneoPage() {
   const partiteElim = partite.filter(p => fasi.includes(p.fase))
   const giocate = partite.filter(p => p.giocata && !fasi.includes(p.fase))
   const daGiocare = partite.filter(p => !p.giocata && !fasi.includes(p.fase))
-  const tabsToShow = isSoloCampionato
-    ? (['gironi','risultati','programma'] as Tab[])
-    : (['gironi','risultati','programma','tabellone'] as Tab[])
+  const primaTabLabel = (torneo.tipo === 'campionato_eliminazione' || torneo.tipo === 'solo_campionato') ? 'Classifica' : 'Gironi'
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -79,7 +77,7 @@ export default function TorneoPage() {
       {/* Tabs */}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200 shadow-sm">
         <div className="max-w-4xl mx-auto px-4 flex gap-1 overflow-x-auto">
-          {([['gironi', (torneo.tipo === 'campionato_eliminazione' || torneo.tipo === 'solo_campionato') ? 'Classifica' : 'Gironi'],['risultati','Risultati'],['programma','Programma'],...(!isSoloCampionato ? [['tabellone','Fase eliminatoria']] : [])] as [Tab,string][]).map(([key,label]) => (
+          {([['gironi', primaTabLabel],['risultati','Risultati'],['programma','Programma'],...(!isSoloCampionato ? [['tabellone','Fase eliminatoria']] : [])] as [Tab,string][]).map(([key,label]) => (
             <button key={key} onClick={() => setTab(key)}
               className={`px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 transition ${tab===key ? 'border-blue-600 text-blue-600' : 'border-transparent text-gray-500 hover:text-gray-700'}`}
               style={tab===key ? { borderColor: primary, color: primary } : {}}>
