@@ -13,7 +13,7 @@ import GironiTab from '@/components/GironiTab'
 import CalendarioBoard from '@/components/CalendarioBoard'
 import ImpostazioniTab from '@/components/ImpostazioniTab'
 
-type AdminTab = 'impostazioni' | 'squadre' | 'calendario' | 'risultati' | 'eliminatoria' | 'banner' | 'sponsor' | 'link'
+type AdminTab = 'impostazioni' | 'squadre' | 'calendario' | 'risultati' | 'classifica' | 'eliminatoria' | 'banner' | 'sponsor' | 'link'
 
 export default function AdminTorneoPage() {
   const { id } = useParams<{ id: string }>()
@@ -313,7 +313,7 @@ export default function AdminTorneoPage() {
   const isSoloCampionato = torneo.tipo === 'solo_campionato'
   const tabs: [AdminTab, string][] = [
     ['impostazioni','Impostazioni'], ['squadre','Squadre'],
-    ['calendario','Calendario'], ['risultati','Risultati'],
+    ['calendario','Calendario'], ['risultati','Risultati'], ['classifica','Classifica'],
     ...(!isSoloCampionato ? [['eliminatoria','Eliminatoria'] as [AdminTab,string]] : []),
     ['banner','Banner'], ['sponsor','Sponsor'], ['link','Link privato']
   ]
@@ -499,6 +499,136 @@ export default function AdminTorneoPage() {
             <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
               <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Fase eliminatoria</div>
               {partiteElim.map(p => <RisultatoRow key={p.id} p={p} onSave={(gc,go) => saveRisultato(p,gc,go)}/>)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* CLASSIFICA */}
+      {tab === 'classifica' && (
+        <div className="space-y-5">
+          {/* Modalità gironi: una classifica per girone */}
+          {gironi.length > 0 ? (
+            <div className="grid gap-5 md:grid-cols-2">
+              {gironi.map(g => {
+                const sqGirone = squadre.filter(s => s.girone_id === g.id)
+                const ptGirone = partite.filter(p => p.girone_id === g.id)
+                const stats = sqGirone.map(sq => {
+                  const mine = ptGirone.filter(p =>
+                    p.giocata && (p.squadra_casa_id === sq.id || p.squadra_ospite_id === sq.id)
+                  )
+                  let v=0, par=0, s=0, gf=0, gs=0
+                  mine.forEach(p => {
+                    const casa = p.squadra_casa_id === sq.id
+                    const miei = casa ? (p.gol_casa??0) : (p.gol_ospite??0)
+                    const avv  = casa ? (p.gol_ospite??0) : (p.gol_casa??0)
+                    gf += miei; gs += avv
+                    if (miei > avv) v++; else if (miei === avv) par++; else s++
+                  })
+                  return { squadra: sq, g: mine.length, v, p: par, s, gf, gs, pt: v*3+par }
+                }).sort((a,b) => b.pt-a.pt || (b.gf-b.gs)-(a.gf-a.gs) || b.gf-a.gf)
+
+                return (
+                  <div key={g.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+                    <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100"
+                      style={{ background: (torneo.colore_primario||'#1e40af') + '10' }}>
+                      Girone {g.nome}
+                      {g.campo && <span className="ml-2 font-normal text-gray-400">— {(g.campo as any).nome}</span>}
+                    </div>
+                    <table className="w-full text-sm">
+                      <thead><tr className="border-b border-gray-50">
+                        <th className="text-left px-3 py-2 text-xs text-gray-400 font-medium">Squadra</th>
+                        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">G</th>
+                        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">V</th>
+                        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">P</th>
+                        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">S</th>
+                        <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">GF</th>
+                        <th className="text-center px-2 py-2 text-xs text-gray-400 font-medium">Pt</th>
+                      </tr></thead>
+                      <tbody>
+                        {stats.map((s, i) => (
+                          <tr key={s.squadra.id} style={i < 2 ? { background: (torneo.colore_primario||'#1e40af') + '0d' } : {}}>
+                            <td className="px-3 py-2">
+                              <div className="flex items-center gap-2">
+                                <span className="text-xs w-4 text-center text-gray-400">{i+1}</span>
+                                <LogoSquadra squadra={s.squadra} size={20}/>
+                                <span className="font-medium text-sm truncate">{s.squadra.nome}</span>
+                              </div>
+                            </td>
+                            <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.g}</td>
+                            <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.v}</td>
+                            <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.p}</td>
+                            <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.s}</td>
+                            <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.gf}</td>
+                            <td className="text-center px-2 py-2 font-bold text-sm" style={{ color: torneo.colore_primario||'#1e40af' }}>{s.pt}</td>
+                          </tr>
+                        ))}
+                        {stats.length === 0 && (
+                          <tr><td colSpan={7} className="text-center py-4 text-sm text-gray-400">Nessuna squadra nel girone</td></tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )
+              })}
+            </div>
+          ) : (
+            /* Modalità campionato: classifica unica */
+            <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
+              <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide border-b border-gray-100"
+                style={{ background: (torneo.colore_primario||'#1e40af') + '10' }}>
+                Classifica generale
+              </div>
+              <table className="w-full text-sm">
+                <thead><tr className="border-b border-gray-50">
+                  <th className="text-left px-3 py-2 text-xs text-gray-400 font-medium">Squadra</th>
+                  <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">G</th>
+                  <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">V</th>
+                  <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">P</th>
+                  <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">S</th>
+                  <th className="text-center px-1 py-2 text-xs text-gray-400 font-medium">GF</th>
+                  <th className="text-center px-2 py-2 text-xs text-gray-400 font-medium">Pt</th>
+                </tr></thead>
+                <tbody>
+                  {(() => {
+                    const ptCamp = partite.filter(p => ['campionato','solo_campionato'].includes(p.fase))
+                    const stats = squadre.map(sq => {
+                      const mine = ptCamp.filter(p =>
+                        p.giocata && (p.squadra_casa_id === sq.id || p.squadra_ospite_id === sq.id)
+                      )
+                      let v=0, par=0, s=0, gf=0, gs=0
+                      mine.forEach(p => {
+                        const casa = p.squadra_casa_id === sq.id
+                        const miei = casa ? (p.gol_casa??0) : (p.gol_ospite??0)
+                        const avv  = casa ? (p.gol_ospite??0) : (p.gol_casa??0)
+                        gf += miei; gs += avv
+                        if (miei > avv) v++; else if (miei === avv) par++; else s++
+                      })
+                      return { squadra: sq, g: mine.length, v, p: par, s, gf, gs, pt: v*3+par }
+                    }).sort((a,b) => b.pt-a.pt || (b.gf-b.gs)-(a.gf-a.gs) || b.gf-a.gf)
+                    return stats.map((s, i) => (
+                      <tr key={s.squadra.id} style={i < 3 ? { background: (torneo.colore_primario||'#1e40af') + '0d' } : {}}>
+                        <td className="px-3 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="text-xs w-4 text-center text-gray-400">{i+1}</span>
+                            <LogoSquadra squadra={s.squadra} size={20}/>
+                            <span className="font-medium text-sm truncate">{s.squadra.nome}</span>
+                          </div>
+                        </td>
+                        <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.g}</td>
+                        <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.v}</td>
+                        <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.p}</td>
+                        <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.s}</td>
+                        <td className="text-center px-1 py-2 text-gray-600 text-sm">{s.gf}</td>
+                        <td className="text-center px-2 py-2 font-bold text-sm" style={{ color: torneo.colore_primario||'#1e40af' }}>{s.pt}</td>
+                      </tr>
+                    ))
+                  })()}
+                  {squadre.length === 0 && (
+                    <tr><td colSpan={7} className="text-center py-4 text-sm text-gray-400">Nessuna squadra ancora</td></tr>
+                  )}
+                </tbody>
+              </table>
             </div>
           )}
         </div>

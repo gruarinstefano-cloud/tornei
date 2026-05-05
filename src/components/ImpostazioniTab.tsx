@@ -51,20 +51,24 @@ export default function ImpostazioniTab({
 
   async function addGironeCampo(gironeId: string, campoId: string) {
     if (!campoId) return
-    const already = gironi.find(g => g.id === gironeId)?.girone_campi?.find(gc => gc.campo_id === campoId)
+    const already = gironi.find(g => g.id === gironeId)?.girone_campi?.find((gc: any) => gc.campo_id === campoId)
     if (already) return
-    const { data } = await sb.from('girone_campi').insert({
+    const girone = gironi.find(g => g.id === gironeId)
+    const isFirst = !(girone?.girone_campi?.length)
+
+    // Aggiorna campo_id legacy sul girone (questo funziona sempre)
+    await sb.from('gironi').update({ campo_id: campoId }).eq('id', gironeId)
+
+    // Prova a inserire in girone_campi (potrebbe non esistere se migration v8 non è stata eseguita)
+    const { data, error } = await sb.from('girone_campi').insert({
       girone_id: gironeId, campo_id: campoId, ordine: 0
     }).select('*, campo:campi(*)').single()
-    if (!data) return
-    // Aggiorna anche campo_id legacy se è il primo campo
-    const girone = gironi.find(g => g.id === gironeId)
-    const isFirst = !girone?.girone_campi?.length
-    if (isFirst) await sb.from('gironi').update({ campo_id: campoId }).eq('id', gironeId)
+
+    const campoObj = campi.find(c => c.id === campoId)
+    const newGc = data ?? { id: campoId, girone_id: gironeId, campo_id: campoId, ordine: 0, campo: campoObj }
+
     onGironiChange(gironi.map(g => g.id === gironeId
-      ? { ...g,
-          campo_id: isFirst ? campoId : g.campo_id,
-          girone_campi: [...(g.girone_campi ?? []), data] }
+      ? { ...g, campo_id: campoId, girone_campi: [...(g.girone_campi ?? []), newGc] }
       : g))
   }
 
