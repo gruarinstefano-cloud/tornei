@@ -361,7 +361,7 @@ export default function ImpostazioniTab({
                   {giornate.length > 0 && (
                     <div className="flex items-center gap-1.5">
                       <label className="text-xs text-gray-400">Giorno:</label>
-                      <select value={g.giornata_id || ''}
+                      <select value={(g as any).giornata_id || ''}
                         onChange={async e => {
                           const gid = e.target.value || null
                           await createClient().from('gironi').update({ giornata_id: gid }).eq('id', g.id)
