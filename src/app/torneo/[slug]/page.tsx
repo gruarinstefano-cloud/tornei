@@ -239,9 +239,10 @@ export default function TorneoPage() {
         {/* TABELLONE */}
         {tab === 'tabellone' && (
           <div className="space-y-4">
-            <p className="text-xs text-gray-500 bg-white border border-gray-200 rounded-lg px-4 py-2">
-              Le prime classificate di ogni girone accedono alla fase eliminatoria
-            </p>
+            <div className="bg-white border border-gray-200 rounded-xl px-4 py-3 space-y-1">
+              <p className="text-xs text-gray-600 font-medium">Schema fase eliminatoria</p>
+              <p className="text-xs text-gray-400">Le prime classificate di ogni girone accedono alla fase eliminatoria</p>
+            </div>
             {partiteElim.length === 0
               ? <div className="text-center py-12 text-gray-400">La fase eliminatoria non è ancora iniziata</div>
               : (

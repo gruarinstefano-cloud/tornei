@@ -11,6 +11,7 @@ import { resizeImage } from '@/lib/imageResize'
 import LinkPrivatoTab from '@/components/LinkPrivatoTab'
 import GironiTab from '@/components/GironiTab'
 import CalendarioBoard from '@/components/CalendarioBoard'
+import FaseFinaleTab from '@/components/FaseFinaleTab'
 import ImpostazioniTab from '@/components/ImpostazioniTab'
 
 type AdminTab = 'impostazioni' | 'squadre' | 'calendario' | 'risultati' | 'classifica' | 'eliminatoria' | 'banner' | 'sponsor' | 'link'
@@ -57,7 +58,7 @@ export default function AdminTorneoPage() {
         sb.from('tornei').select('*').eq('id', id).single(),
         sb.from('squadre').select('*').eq('torneo_id', id),
         sb.from('campi').select('*').eq('torneo_id', id).order('ordine'),
-        sb.from('gironi').select('*, campo:campi(*), girone_campi:girone_campi(*, campo:campi(*))').eq('torneo_id', id).order('ordine'),
+        sb.from('gironi').select('*, campo:campi(*), girone_campi:girone_campi(*, campo:campi(*)), girone_giornate:girone_giornate(*)').eq('torneo_id', id).order('ordine'),
         sb.from('giornate').select('*, slot:slot_campo(*)').eq('torneo_id', id).order('data'),
         sb.from('partite').select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)').eq('torneo_id', id).order('ordine_calendario'),
         sb.from('pause').select('*').eq('torneo_id', id).order('ordine_calendario'),
@@ -636,35 +637,11 @@ export default function AdminTorneoPage() {
 
       {/* ELIMINATORIA */}
       {tab === 'eliminatoria' && (
-        <div className="space-y-4">
-          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800">
-            Verranno prese le prime <strong>{torneo.n_squadre_eliminatoria}</strong> squadre qualificate.
-            {torneo.finale_terzo_posto && <span> Finale 3°/4° posto <strong>abilitata</strong>.</span>}
-            {giornate.length > 1 && <span> Le partite saranno assegnate all'ultima giornata ({formatDataBreve(giornate[giornate.length-1]?.data)}).</span>}
-          </div>
-          <button onClick={generaFaseEliminatoria}
-            className="w-full py-3 bg-green-600 text-white rounded-xl font-medium hover:bg-green-700 transition">
-            ⚡ Genera fase eliminatoria automaticamente
-          </button>
-          {partiteElim.length > 0 && (
-            <div className="bg-white rounded-xl border border-gray-200 divide-y divide-gray-50">
-              <div className="px-4 py-3 text-xs font-semibold text-gray-500 uppercase tracking-wide">Accoppiamenti</div>
-              {partiteElim.map(p => (
-                <div key={p.id} className="flex items-center gap-3 px-4 py-3">
-                  <div className="flex items-center gap-1.5 flex-1 justify-end">
-                    <LogoSquadra squadra={(p.squadra_casa as any) ?? { nome:'?', logo_url:null }} size={22}/>
-                    <span className="text-sm font-medium">{(p.squadra_casa as any)?.nome ?? '–'}</span>
-                  </div>
-                  <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded">{p.fase}</span>
-                  <div className="flex items-center gap-1.5 flex-1">
-                    <span className="text-sm font-medium">{(p.squadra_ospite as any)?.nome ?? '–'}</span>
-                    <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={22}/>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <FaseFinaleTab
+          torneo={torneo} squadre={squadre} gironi={gironi}
+          partite={partite} campi={campi} giornate={giornate}
+          torneoId={id}
+          onPartiteChange={setPartite}/>
       )}
 
       {/* BANNER */}

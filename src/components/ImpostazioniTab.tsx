@@ -355,8 +355,31 @@ export default function ImpostazioniTab({
             ? <p className="text-sm text-gray-400 text-center py-3">Nessun girone ancora</p>
             : gironi.map(g => (
               <div key={g.id} className="py-2 border-b border-gray-50 last:border-0">
-                <div className="flex items-center gap-3 mb-1.5">
+                <div className="flex items-center gap-3 mb-1.5 flex-wrap">
                   <span className="font-bold text-gray-800 w-16 flex-shrink-0">Girone {g.nome}</span>
+                  {/* Assegna giornata al girone */}
+                  {giornate.length > 0 && (
+                    <div className="flex items-center gap-1.5">
+                      <label className="text-xs text-gray-400">Giorno:</label>
+                      <select value={g.giornata_id || ''}
+                        onChange={async e => {
+                          const gid = e.target.value || null
+                          await createClient().from('gironi').update({ giornata_id: gid }).eq('id', g.id)
+                          // Aggiorna partite del girone con la nuova giornata
+                          if (gid) await createClient().from('partite')
+                            .update({ giornata_id: gid })
+                            .eq('girone_id', g.id)
+                          onGironiChange(gironi.map(x => x.id === g.id ? { ...x, giornata_id: gid } : x))
+                        }}
+                        className="px-2 py-1 border border-gray-300 rounded text-xs text-gray-600">
+                        <option value="">Nessun giorno</option>
+                        {giornate.map(gn => (
+                          <option key={gn.id} value={gn.id}>{formatDataBreve(gn.data)}</option>
+                        ))}
+                      </select>
+                    </div>
+                  )}
+                  </div>
                   <div className="flex items-center gap-2 flex-1 flex-wrap">
                     {(g.girone_campi ?? []).map(gc => (
                       <div key={gc.campo_id} className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-lg text-xs">
