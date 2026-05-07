@@ -236,13 +236,14 @@ export default function AdminTorneoPage() {
     if (acc.length === 0) { showMsg('Nessun accoppiamento generabile.', 'err'); return }
 
     // Usa ultima giornata per eliminatoria se disponibile
-    const ultimaGiornata = giornate[giornate.length-1]?.id ?? null
+    // Usa la giornata configurata nelle impostazioni, altrimenti l'ultima disponibile
+    const giornataElim = (torneo as any).giornata_eliminatoria_id ?? giornate[giornate.length-1]?.id ?? null
     await sb.from('partite').delete().eq('torneo_id', id).in('fase', ['quarti','semifinale','finale','terzo_posto'])
     const { data, error } = await sb.from('partite').insert(
       acc.map((a,i) => ({
         torneo_id: id, squadra_casa_id: a.casa.id, squadra_ospite_id: a.ospite.id,
         fase: a.fase, girone: null, girone_id: null, giocata: false,
-        ordine_calendario: i, giornata_id: ultimaGiornata
+        ordine_calendario: i, giornata_id: giornataElim
       }))
     ).select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)')
     if (error) showMsg('Errore: ' + error.message, 'err')

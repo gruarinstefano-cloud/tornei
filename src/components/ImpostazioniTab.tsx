@@ -417,6 +417,74 @@ export default function ImpostazioniTab({
         </div>
       )}
 
+      {/* ===== FASE ELIMINATORIA ===== */}
+      {!isNuovo && torneo.tipo !== 'solo_campionato' && (
+        <Section title="Fase eliminatoria">
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Giornata</label>
+              <select
+                value={(torneo as any).giornata_eliminatoria_id || ''}
+                onChange={e => onTorneoChange({ ...torneo, giornata_eliminatoria_id: e.target.value || null } as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+                <option value="">Nessuna giornata</option>
+                {giornate.map(g => (
+                  <option key={g.id} value={g.id}>{formatDataBreve(g.data)}</option>
+                ))}
+              </select>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 mb-1">Orario inizio</label>
+              <input type="time"
+                value={(torneo as any).orario_eliminatoria || ''}
+                onChange={e => onTorneoChange({ ...torneo, orario_eliminatoria: e.target.value } as any)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"/>
+            </div>
+          </div>
+
+          {/* Schema accoppiamenti anonimi */}
+          {gironi.length > 0 && (
+            <div className="mt-2">
+              <label className="block text-xs font-medium text-gray-500 mb-2">Schema accoppiamenti</label>
+              <div className="space-y-1.5">
+                {(() => {
+                  const nElim = (torneo.n_squadre_eliminatoria as number) ?? 4
+                  const nPerGirone = Math.ceil(nElim / Math.max(gironi.length, 1))
+                  const fase = nElim >= 8 ? 'Quarti' : nElim >= 4 ? 'Semifinali' : 'Finale'
+                  // Genera accoppiamenti anonimi: 1°A vs 2°B, 1°B vs 2°A...
+                  const qualificate: { pos: number; girone: string }[] = []
+                  for (let pos = 0; pos < nPerGirone; pos++)
+                    for (const g of gironi)
+                      qualificate.push({ pos: pos+1, girone: g.nome })
+                  const n = qualificate.length
+                  const matches: { casa: typeof qualificate[0]; ospite: typeof qualificate[0] }[] = []
+                  for (let i = 0; i < n/2; i++)
+                    matches.push({ casa: qualificate[i], ospite: qualificate[n-1-i] })
+                  if (torneo.finale_terzo_posto && matches.length >= 2)
+                    matches.push({ casa: qualificate[1], ospite: qualificate[2] })
+                  return matches.map((m, i) => (
+                    <div key={i} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg text-sm">
+                      <span className="flex-1 text-right font-medium text-gray-700">
+                        {m.casa.pos}° Girone {m.casa.girone}
+                      </span>
+                      <span className="text-xs text-gray-400 bg-white border border-gray-200 px-2 py-0.5 rounded">
+                        {i === matches.length-1 && torneo.finale_terzo_posto ? '3°/4°' : fase}
+                      </span>
+                      <span className="flex-1 font-medium text-gray-700">
+                        {m.ospite.pos}° Girone {m.ospite.girone}
+                      </span>
+                    </div>
+                  ))
+                })()}
+              </div>
+              <p className="text-xs text-gray-400 mt-2">
+                I nomi delle squadre saranno visibili solo dopo la generazione automatica degli accoppiamenti
+              </p>
+            </div>
+          )}
+        </Section>
+      )}
+
       <button onClick={onSave} disabled={saving}
         className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 disabled:opacity-50 transition">
         {saving ? 'Salvataggio...' : isNuovo ? 'Crea torneo' : 'Salva impostazioni'}
