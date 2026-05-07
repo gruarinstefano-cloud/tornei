@@ -365,7 +365,6 @@ export default function ImpostazioniTab({
                         onChange={async e => {
                           const gid = e.target.value || null
                           await createClient().from('gironi').update({ giornata_id: gid }).eq('id', g.id)
-                          // Aggiorna partite del girone con la nuova giornata
                           if (gid) await createClient().from('partite')
                             .update({ giornata_id: gid })
                             .eq('girone_id', g.id)
@@ -379,9 +378,9 @@ export default function ImpostazioniTab({
                       </select>
                     </div>
                   )}
-                  </div>
-                  <div className="flex items-center gap-2 flex-1 flex-wrap">
-                    {(g.girone_campi ?? []).map(gc => (
+                  {/* Campi del girone */}
+                  <div className="flex items-center gap-2 flex-wrap">
+                    {(g.girone_campi ?? []).map((gc: any) => (
                       <div key={gc.campo_id} className="flex items-center gap-1 px-2 py-1 bg-gray-100 rounded-lg text-xs">
                         <span className="w-2 h-2 rounded-full flex-shrink-0"
                           style={{ background: campi.find(cc => cc.id === gc.campo_id)?.colore ?? '#ccc' }}/>
