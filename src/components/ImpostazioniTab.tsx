@@ -498,6 +498,90 @@ function CampoRow({ campo, onRename, onDelete }: {
   )
 }
 
+// ===== TIPI E HELPER SCHEMA ELIMINATORIA =====
+
+type SlotGirone = { tipo: 'girone'; pos: number; gironeNome: string }
+type SlotMatch  = { tipo: 'match';  matchId: string; esito: 'vincente' | 'perdente' }
+type Slot = SlotGirone | SlotMatch
+interface MatchSch { id: string; label: string; fase: string; casa: Slot; ospite: Slot }
+
+function labelSlot(s: Slot, schema: MatchSch[]): string {
+  if (s.tipo === 'girone') return `${s.pos}° Girone ${s.gironeNome}`
+  const m = schema.find(x => x.id === s.matchId)
+  return `${s.esito === 'vincente' ? 'Vincente' : 'Perdente'} ${m?.label ?? s.matchId}`
+}
+
+const FASE_LABELS: Record<string,string> = {
+  ottavi: 'Ottavi di finale', quarti: 'Quarti di finale',
+  semifinale: 'Semifinali', finale: 'Finale', terzo_posto: '3°/4° posto'
+}
+
+function fasiNecessarie(nElim: number, hasTP: boolean): string[] {
+  if (nElim >= 16) return ['ottavi','quarti','semifinale','finale',...(hasTP?['terzo_posto']:[]) ]
+  if (nElim >= 8)  return ['quarti','semifinale','finale',...(hasTP?['terzo_posto']:[]) ]
+  if (nElim >= 4)  return ['semifinale','finale',...(hasTP?['terzo_posto']:[]) ]
+  return ['finale']
+}
+
+function buildDefaultSchema(gironi: Girone[], nElim: number, hasTP: boolean): MatchSch[] {
+  const fasi = fasiNecessarie(nElim, hasTP)
+  const primaFase = fasi[0]
+  const nPerGirone = Math.max(1, Math.ceil(nElim / Math.max(gironi.length, 1)))
+  const qualificate: SlotGirone[] = []
+  for (let pos = 1; pos <= nPerGirone; pos++)
+    for (const g of gironi)
+      qualificate.push({ tipo:'girone', pos, gironeNome: g.nome })
+  const matches: MatchSch[] = []
+  let counter = 1
+  const nPrima = nElim >= 16 ? 8 : nElim >= 8 ? 4 : nElim >= 4 ? 2 : 1
+  const q = [...qualificate]
+  const n = q.length
+  for (let i = 0; i < nPrima && i < Math.floor(n/2); i++) {
+    matches.push({ id:`m${counter}`, label:`Match ${counter}`, fase:primaFase, casa:q[i], ospite:q[n-1-i] })
+    counter++
+  }
+  let fasePrev = primaFase
+  for (let fi = 1; fi < fasi.length; fi++) {
+    const fase = fasi[fi]
+    if (fase === 'terzo_posto') {
+      const semi = matches.filter(m => m.fase === 'semifinale')
+      if (semi.length >= 2)
+        matches.push({ id:`m${counter}`, label:`Match ${counter}`, fase:'terzo_posto',
+          casa:{tipo:'match',matchId:semi[0].id,esito:'perdente'},
+          ospite:{tipo:'match',matchId:semi[1].id,esito:'perdente'} })
+      counter++; continue
+    }
+    const prev = matches.filter(m => m.fase === fasePrev)
+    for (let i = 0; i < Math.floor(prev.length/2); i++) {
+      matches.push({ id:`m${counter}`, label:`Match ${counter}`, fase,
+        casa:{tipo:'match',matchId:prev[i*2].id,esito:'vincente'},
+        ospite:{tipo:'match',matchId:prev[i*2+1].id,esito:'vincente'} })
+      counter++
+    }
+    fasePrev = fase
+  }
+  return matches
+}
+
+function opzioniSlot(fase: string, schema: MatchSch[], gironi: Girone[], nElim: number): Slot[] {
+  const fasi = fasiNecessarie(nElim, false)
+  const nPerGirone = Math.max(1, Math.ceil(nElim / Math.max(gironi.length, 1)))
+  const opts: Slot[] = []
+  const maxPos = nPerGirone + 2
+  for (let pos = 1; pos <= maxPos; pos++)
+    for (const g of gironi)
+      opts.push({ tipo:'girone', pos, gironeNome: g.nome })
+  const faseIdx = fasi.indexOf(fase)
+  for (const m of schema) {
+    const mIdx = fasi.indexOf(m.fase)
+    if (mIdx < faseIdx || (fase === 'terzo_posto' && m.fase === 'semifinale')) {
+      opts.push({ tipo:'match', matchId:m.id, esito:'vincente' })
+      opts.push({ tipo:'match', matchId:m.id, esito:'perdente' })
+    }
+  }
+  return opts
+}
+
 function SchemaEliminatoria({ torneo, gironi, onTorneoChange }: {
   torneo: Partial<Torneo>; gironi: Girone[]; onTorneoChange: (t: Partial<Torneo>) => void
 }) {

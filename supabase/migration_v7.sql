@@ -6,10 +6,11 @@ CREATE TABLE IF NOT EXISTS public.giornate (
   ordine int DEFAULT 0
 );
 ALTER TABLE public.giornate ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "Giornate visibili a tutti" ON public.giornate FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Giornate gestibili dall'admin" ON public.giornate FOR ALL USING (
+CREATE POLICY "Giornate visibili a tutti" ON public.giornate FOR SELECT USING (true);
+CREATE POLICY "Giornate gestibili dall'admin" ON public.giornate FOR ALL USING (
   EXISTS (SELECT 1 FROM public.tornei t WHERE t.id = torneo_id AND t.admin_id = auth.uid())
 );
+
 CREATE TABLE IF NOT EXISTS public.slot_campo (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   torneo_id uuid REFERENCES public.tornei(id) ON DELETE CASCADE NOT NULL,
@@ -19,10 +20,11 @@ CREATE TABLE IF NOT EXISTS public.slot_campo (
   UNIQUE(giornata_id, campo_id)
 );
 ALTER TABLE public.slot_campo ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "SlotCampo visibili a tutti" ON public.slot_campo FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "SlotCampo gestibili dall'admin" ON public.slot_campo FOR ALL USING (
+CREATE POLICY "SlotCampo visibili a tutti" ON public.slot_campo FOR SELECT USING (true);
+CREATE POLICY "SlotCampo gestibili dall'admin" ON public.slot_campo FOR ALL USING (
   EXISTS (SELECT 1 FROM public.tornei t WHERE t.id = torneo_id AND t.admin_id = auth.uid())
 );
+
 CREATE TABLE IF NOT EXISTS public.pause (
   id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
   torneo_id uuid REFERENCES public.tornei(id) ON DELETE CASCADE NOT NULL,
@@ -35,7 +37,7 @@ CREATE TABLE IF NOT EXISTS public.pause (
   ordine_calendario int DEFAULT 0
 );
 ALTER TABLE public.pause ENABLE ROW LEVEL SECURITY;
-CREATE POLICY IF NOT EXISTS "Pause visibili a tutti" ON public.pause FOR SELECT USING (true);
-CREATE POLICY IF NOT EXISTS "Pause gestibili dall'admin" ON public.pause FOR ALL USING (
+CREATE POLICY "Pause visibili a tutti" ON public.pause FOR SELECT USING (true);
+CREATE POLICY "Pause gestibili dall'admin" ON public.pause FOR ALL USING (
   EXISTS (SELECT 1 FROM public.tornei t WHERE t.id = torneo_id AND t.admin_id = auth.uid())
 );
