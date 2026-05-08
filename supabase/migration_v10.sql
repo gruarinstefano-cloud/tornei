@@ -28,3 +28,6 @@ alter table public.gironi add column if not exists giornata_id uuid references p
 -- Aggiunge giornata e orario per la fase eliminatoria
 ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS giornata_eliminatoria_id uuid references public.giornate(id) on delete set null;
 ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS orario_eliminatoria time;
+
+-- Schema accoppiamenti eliminatoria (JSON configurabile)
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS schema_eliminatoria jsonb;

@@ -228,24 +228,50 @@ export default function AdminTorneoPage() {
 
   async function generaFaseEliminatoria() {
     const sb = createClient()
-    const nElim = (torneo.n_squadre_eliminatoria as number) ?? 4
-    const nPerGirone = Math.ceil(nElim / Math.max(gironi.length, 1))
+    const giornataElim = (torneo as any).giornata_eliminatoria_id ?? giornate[giornate.length-1]?.id ?? null
+    const schemaRaw = (torneo as any).schema_eliminatoria
+    let toInsert: any[] = []
+
+    // Calcola classifiche
     const classifiche: Record<string, any[]> = {}
     for (const g of gironi) classifiche[g.id] = calcolaClassifica(squadre, partite, g.id)
-    const acc = generaEliminatoria(gironi, classifiche, nPerGirone, torneo.finale_terzo_posto ?? false)
-    if (acc.length === 0) { showMsg('Nessun accoppiamento generabile.', 'err'); return }
+    const gironeByNome: Record<string, string> = {}
+    gironi.forEach(g => { gironeByNome[g.nome] = g.id })
 
-    // Usa ultima giornata per eliminatoria se disponibile
-    // Usa la giornata configurata nelle impostazioni, altrimenti l'ultima disponibile
-    const giornataElim = (torneo as any).giornata_eliminatoria_id ?? giornate[giornate.length-1]?.id ?? null
-    await sb.from('partite').delete().eq('torneo_id', id).in('fase', ['quarti','semifinale','finale','terzo_posto'])
-    const { data, error } = await sb.from('partite').insert(
-      acc.map((a,i) => ({
+    if (schemaRaw) {
+      // Usa lo schema configurato
+      const schema: any[] = typeof schemaRaw === 'string' ? JSON.parse(schemaRaw) : schemaRaw
+      schema.forEach((m: any, i: number) => {
+        if (m.casa.tipo !== 'girone' || m.ospite.tipo !== 'girone') return
+        const gidCasa = gironeByNome[m.casa.gironeNome]
+        const gidOspite = gironeByNome[m.ospite.gironeNome]
+        const casa = (classifiche[gidCasa] ?? [])[m.casa.pos - 1]?.squadra
+        const ospite = (classifiche[gidOspite] ?? [])[m.ospite.pos - 1]?.squadra
+        if (!casa || !ospite) return
+        toInsert.push({
+          torneo_id: id, squadra_casa_id: casa.id, squadra_ospite_id: ospite.id,
+          fase: m.fase, girone: null, girone_id: null, giocata: false,
+          ordine_calendario: i, giornata_id: giornataElim
+        })
+      })
+    }
+
+    if (toInsert.length === 0) {
+      // Fallback: generazione automatica standard
+      const nElim = (torneo.n_squadre_eliminatoria as number) ?? 4
+      const nPerGirone = Math.ceil(nElim / Math.max(gironi.length, 1))
+      const acc = generaEliminatoria(gironi, classifiche, nPerGirone, torneo.finale_terzo_posto ?? false)
+      if (acc.length === 0) { showMsg('Nessun accoppiamento generabile. Inserisci prima i risultati.', 'err'); return }
+      toInsert = acc.map((a,i) => ({
         torneo_id: id, squadra_casa_id: a.casa.id, squadra_ospite_id: a.ospite.id,
         fase: a.fase, girone: null, girone_id: null, giocata: false,
         ordine_calendario: i, giornata_id: giornataElim
       }))
-    ).select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)')
+    }
+
+    await sb.from('partite').delete().eq('torneo_id', id).in('fase', ['quarti','semifinale','finale','terzo_posto'])
+    const { data, error } = await sb.from('partite').insert(toInsert)
+      .select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)')
     if (error) showMsg('Errore: ' + error.message, 'err')
     else { setPartite(prev => [...prev.filter(p => !['quarti','semifinale','finale','terzo_posto'].includes(p.fase)), ...(data as Partita[])]); showMsg('Eliminatoria generata!') }
   }

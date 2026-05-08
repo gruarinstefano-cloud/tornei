@@ -1,5 +1,4 @@
 'use client'
-import Image from 'next/image'
 import type { Torneo, Sponsor } from '@/lib/types'
 
 type Props = {
@@ -14,13 +13,13 @@ export default function BannerTorneo({ torneo, sponsor }: Props) {
     <div className="w-full">
       {/* Banner immagine */}
       {torneo.banner_url ? (
-        <div className="relative w-full" style={{ height: '180px' }}>
-          <Image
+        <div className="relative w-full overflow-hidden" style={{ maxHeight: '220px' }}>
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img
             src={torneo.banner_url}
             alt={torneo.nome}
-            fill
-            className="object-cover"
-            priority
+            className="w-full object-cover"
+            style={{ maxHeight: '220px', display: 'block' }}
           />
           {/* Overlay con nome torneo */}
           <div className="absolute inset-0 bg-gradient-to-t from-black/60 to-transparent flex items-end px-6 pb-4">
@@ -31,13 +30,12 @@ export default function BannerTorneo({ torneo, sponsor }: Props) {
               </div>
               <div>
                 <div className="text-white font-bold text-xl leading-tight drop-shadow">{torneo.nome_societa || torneo.nome}</div>
-                <div className="text-white/80 text-sm">{torneo.nome}</div>
+                {torneo.nome_societa && <div className="text-white/80 text-sm">{torneo.nome}</div>}
               </div>
             </div>
           </div>
         </div>
       ) : (
-        /* Fallback senza immagine */
         <div className="px-4 py-4" style={{ background: primary + '18', borderBottom: `2px solid ${primary}30` }}>
           <div className="max-w-4xl mx-auto flex items-center gap-3">
             <div className="w-12 h-12 rounded-full flex items-center justify-center text-white font-bold text-lg flex-shrink-0"
@@ -46,7 +44,7 @@ export default function BannerTorneo({ torneo, sponsor }: Props) {
             </div>
             <div>
               <div className="font-bold text-gray-900 text-lg leading-tight">{torneo.nome_societa || torneo.nome}</div>
-              <div className="text-sm text-gray-500">{torneo.nome}</div>
+              {torneo.nome_societa && <div className="text-sm text-gray-500">{torneo.nome}</div>}
             </div>
           </div>
         </div>
@@ -71,12 +69,12 @@ export default function BannerTorneo({ torneo, sponsor }: Props) {
 
 function SponsorBadge({ sponsor }: { sponsor: Sponsor }) {
   const inner = sponsor.logo_url ? (
-    <Image
+    // eslint-disable-next-line @next/next/no-img-element
+    <img
       src={sponsor.logo_url}
       alt={sponsor.nome}
-      width={120}
-      height={60}
       className="object-contain"
+      style={{ maxHeight: '36px', maxWidth: '120px' }}
     />
   ) : (
     <span className="text-sm font-medium text-gray-600 whitespace-nowrap px-2">{sponsor.nome}</span>

@@ -420,6 +420,7 @@ export default function ImpostazioniTab({
       {/* ===== FASE ELIMINATORIA ===== */}
       {!isNuovo && torneo.tipo !== 'solo_campionato' && (
         <Section title="Fase eliminatoria">
+          {/* Giornata e orario */}
           <div className="grid grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-medium text-gray-500 mb-1">Giornata</label>
@@ -442,46 +443,8 @@ export default function ImpostazioniTab({
             </div>
           </div>
 
-          {/* Schema accoppiamenti anonimi */}
-          {gironi.length > 0 && (
-            <div className="mt-2">
-              <label className="block text-xs font-medium text-gray-500 mb-2">Schema accoppiamenti</label>
-              <div className="space-y-1.5">
-                {(() => {
-                  const nElim = (torneo.n_squadre_eliminatoria as number) ?? 4
-                  const nPerGirone = Math.ceil(nElim / Math.max(gironi.length, 1))
-                  const fase = nElim >= 8 ? 'Quarti' : nElim >= 4 ? 'Semifinali' : 'Finale'
-                  // Genera accoppiamenti anonimi: 1°A vs 2°B, 1°B vs 2°A...
-                  const qualificate: { pos: number; girone: string }[] = []
-                  for (let pos = 0; pos < nPerGirone; pos++)
-                    for (const g of gironi)
-                      qualificate.push({ pos: pos+1, girone: g.nome })
-                  const n = qualificate.length
-                  const matches: { casa: typeof qualificate[0]; ospite: typeof qualificate[0] }[] = []
-                  for (let i = 0; i < n/2; i++)
-                    matches.push({ casa: qualificate[i], ospite: qualificate[n-1-i] })
-                  if (torneo.finale_terzo_posto && matches.length >= 2)
-                    matches.push({ casa: qualificate[1], ospite: qualificate[2] })
-                  return matches.map((m, i) => (
-                    <div key={i} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg text-sm">
-                      <span className="flex-1 text-right font-medium text-gray-700">
-                        {m.casa.pos}° Girone {m.casa.girone}
-                      </span>
-                      <span className="text-xs text-gray-400 bg-white border border-gray-200 px-2 py-0.5 rounded">
-                        {i === matches.length-1 && torneo.finale_terzo_posto ? '3°/4°' : fase}
-                      </span>
-                      <span className="flex-1 font-medium text-gray-700">
-                        {m.ospite.pos}° Girone {m.ospite.girone}
-                      </span>
-                    </div>
-                  ))
-                })()}
-              </div>
-              <p className="text-xs text-gray-400 mt-2">
-                I nomi delle squadre saranno visibili solo dopo la generazione automatica degli accoppiamenti
-              </p>
-            </div>
-          )}
+          {/* Schema accoppiamenti configurabile */}
+          <SchemaEliminatoria torneo={torneo} gironi={gironi} onTorneoChange={onTorneoChange}/>
         </Section>
       )}
 
@@ -531,6 +494,138 @@ function CampoRow({ campo, onRename, onDelete }: {
         )}
       </div>
       <button onClick={onDelete} className="text-red-400 hover:text-red-600 text-xs flex-shrink-0">Rimuovi</button>
+    </div>
+  )
+}
+
+// Tipi per lo schema configurabile
+type SlotQualificata = { tipo: 'girone'; pos: number; gironeNome: string } | { tipo: 'semifinale'; n: number; esito: 'vincente' | 'perdente' }
+
+type MatchSchema = { id: string; fase: string; casa: SlotQualificata; ospite: SlotQualificata }
+
+function labelSlot(s: SlotQualificata): string {
+  if (s.tipo === 'girone') return `${s.pos}° Girone ${s.gironeNome}`
+  const faseLabel = s.n <= 4 ? `Quarto ${s.n}` : `Semifin. ${s.n - 4}`
+  return `${s.esito === 'vincente' ? 'Vinc.' : 'Perd.'} ${faseLabel}`
+}
+
+function SchemaEliminatoria({ torneo, gironi, onTorneoChange }: {
+  torneo: Partial<Torneo>; gironi: Girone[]; onTorneoChange: (t: Partial<Torneo>) => void
+}) {
+  const nElim = (torneo.n_squadre_eliminatoria as number) ?? 4
+  const nPerGirone = Math.max(1, Math.ceil(nElim / Math.max(gironi.length, 1)))
+  const hasQuarti = nElim >= 8
+  const hasSemifin = nElim >= 4
+  const hasTP = torneo.finale_terzo_posto
+
+  // Opzioni qualificate dai gironi
+  const opzioniGirone: SlotQualificata[] = []
+  for (let pos = 1; pos <= nPerGirone; pos++)
+    for (const g of gironi)
+      opzioniGirone.push({ tipo: 'girone', pos, gironeNome: g.nome })
+
+  // Opzioni da fasi precedenti (quarti -> semifinali, semifinali -> finale)
+  const nQuarti = hasQuarti ? 4 : 0
+  const nSemi = hasSemifin ? (hasQuarti ? 2 : 2) : 0
+  const opzioniSemi: SlotQualificata[] = []
+  // Opzioni dai quarti (se presenti)
+  for (let i = 1; i <= nQuarti; i++) {
+    opzioniSemi.push({ tipo: 'semifinale', n: i, esito: 'vincente' })
+    opzioniSemi.push({ tipo: 'semifinale', n: i, esito: 'perdente' })
+  }
+  // Opzioni dalle semifinali
+  for (let i = 1; i <= nSemi; i++) {
+    if (!opzioniSemi.find(o => o.tipo === 'semifinale' && o.n === i && o.esito === 'vincente'))
+      opzioniSemi.push({ tipo: 'semifinale', n: i, esito: 'vincente' })
+    if (!opzioniSemi.find(o => o.tipo === 'semifinale' && o.n === i && o.esito === 'perdente'))
+      opzioniSemi.push({ tipo: 'semifinale', n: i, esito: 'perdente' })
+  }
+
+  // Schema salvato nel torneo (JSON) o default automatico
+  const schemaKey = 'schema_eliminatoria'
+  const schemaRaw = (torneo as any)[schemaKey]
+  
+  // Default schema
+  function defaultSchema(): MatchSchema[] {
+    const matches: MatchSchema[] = []
+    const q = [...opzioniGirone]
+    const n = q.length
+
+    if (hasQuarti) {
+      // 4 quarti di finale dai gironi
+      for (let i = 0; i < Math.min(4, Math.floor(n/2)); i++)
+        matches.push({ id: `q${i}`, fase: 'quarti', casa: q[i], ospite: q[n-1-i] })
+      // 2 semifinali: vincitori quarti
+      matches.push({ id: 'sf1', fase: 'semifinale', casa: { tipo: 'semifinale', n: 1, esito: 'vincente' }, ospite: { tipo: 'semifinale', n: 2, esito: 'vincente' } })
+      matches.push({ id: 'sf2', fase: 'semifinale', casa: { tipo: 'semifinale', n: 3, esito: 'vincente' }, ospite: { tipo: 'semifinale', n: 4, esito: 'vincente' } })
+      // Finale: vincitori semifinali 1 e 2 (usando indici 5 e 6 per distinguere dalle semifinali quarti)
+      matches.push({ id: 'finale', fase: 'finale', casa: { tipo: 'semifinale', n: 5, esito: 'vincente' }, ospite: { tipo: 'semifinale', n: 6, esito: 'vincente' } })
+      if (hasTP) matches.push({ id: 'terzo', fase: 'terzo_posto', casa: { tipo: 'semifinale', n: 5, esito: 'perdente' }, ospite: { tipo: 'semifinale', n: 6, esito: 'perdente' } })
+    } else if (hasSemifin) {
+      // Semifinali dirette dai gironi
+      for (let i = 0; i < Math.min(2, Math.floor(n/2)); i++)
+        matches.push({ id: `sf${i}`, fase: 'semifinale', casa: q[i], ospite: q[n-1-i] })
+      // Finale
+      matches.push({ id: 'finale', fase: 'finale', casa: { tipo: 'semifinale', n: 1, esito: 'vincente' }, ospite: { tipo: 'semifinale', n: 2, esito: 'vincente' } })
+      if (hasTP) matches.push({ id: 'terzo', fase: 'terzo_posto', casa: { tipo: 'semifinale', n: 1, esito: 'perdente' }, ospite: { tipo: 'semifinale', n: 2, esito: 'perdente' } })
+    } else {
+      // Solo finale
+      if (n >= 2) matches.push({ id: 'finale', fase: 'finale', casa: q[0], ospite: q[1] })
+    }
+    return matches
+  }
+
+  const schema: MatchSchema[] = schemaRaw ? JSON.parse(schemaRaw) : defaultSchema()
+
+  function save(newSchema: MatchSchema[]) {
+    onTorneoChange({ ...torneo, [schemaKey]: JSON.stringify(newSchema) } as any)
+  }
+
+  function updateSlot(matchId: string, side: 'casa' | 'ospite', value: string) {
+    const parsed: SlotQualificata = JSON.parse(value)
+    save(schema.map(m => m.id === matchId ? { ...m, [side]: parsed } : m))
+  }
+
+  const faseLabel = (f: string) => ({ quarti:'Quarti', semifinale:'Semifinali', finale:'Finale', terzo_posto:'3°/4° posto' }[f] ?? f)
+  const fasiFiltrate = [...new Set(schema.map(m => m.fase))]
+  const opzioniAll = [...opzioniGirone, ...opzioniSemi]
+
+  return (
+    <div className="space-y-3 mt-1">
+      <div className="flex items-center justify-between">
+        <label className="block text-xs font-medium text-gray-500">Schema accoppiamenti configurabile</label>
+        <button onClick={() => save(defaultSchema())}
+          className="text-xs text-blue-600 hover:underline">Ripristina default</button>
+      </div>
+      <p className="text-xs text-gray-400">
+        I nomi delle squadre sono anonimi fino alla generazione. Puoi cambiare gli abbinamenti trascinando o usando i menu.
+      </p>
+
+      {fasiFiltrate.map(fase => (
+        <div key={fase}>
+          <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5">{faseLabel(fase)}</div>
+          <div className="space-y-1.5">
+            {schema.filter(m => m.fase === fase).map((m, idx) => (
+              <div key={m.id} className="flex items-center gap-2 bg-gray-50 rounded-lg px-3 py-2">
+                <span className="text-xs text-gray-400 w-4 flex-shrink-0">{idx+1}</span>
+                <select value={JSON.stringify(m.casa)} onChange={e => updateSlot(m.id, 'casa', e.target.value)}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs bg-white">
+                  {opzioniAll.map((o,i) => (
+                    <option key={i} value={JSON.stringify(o)}>{labelSlot(o)}</option>
+                  ))}
+                </select>
+                <span className="text-xs text-gray-400 flex-shrink-0">vs</span>
+                <select value={JSON.stringify(m.ospite)} onChange={e => updateSlot(m.id, 'ospite', e.target.value)}
+                  className="flex-1 px-2 py-1 border border-gray-300 rounded text-xs bg-white">
+                  {opzioniAll.map((o,i) => (
+                    <option key={i} value={JSON.stringify(o)}>{labelSlot(o)}</option>
+                  ))}
+                </select>
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
     </div>
   )
 }
