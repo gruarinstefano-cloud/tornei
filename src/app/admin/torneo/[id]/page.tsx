@@ -342,7 +342,7 @@ export default function AdminTorneoPage() {
     // Genera le partite della fase successiva
     const toInsert: any[] = []
     schema.filter((m:any) => m.fase === faseSuccessiva).forEach((m:any, i:number) => {
-      function risolviSlot(slot: any): any | null {
+      const risolviSlot = (slot: any): any | null => {
         if (slot.tipo === 'match') {
           const res = matchResults[slot.matchId]
           return res ? res[slot.esito as 'vincente'|'perdente'] : null
@@ -367,7 +367,8 @@ export default function AdminTorneoPage() {
     else {
       setPartite(prev => [...prev, ...(data as Partita[])])
       const lbl = { quarti:'Quarti', semifinale:'Semifinali', finale:'Finale', terzo_posto:'3°/4° posto', ottavi:'Ottavi' }
-      showMsg(`${lbl[faseSuccessiva as keyof typeof lbl] ?? faseSuccessiva} generati! (${toInsert.length} partite)`)
+      const faseNomeLabel = lbl[faseSuccessiva as keyof typeof lbl] ?? faseSuccessiva
+      showMsg(faseNomeLabel + ' generati! (' + toInsert.length + ' partite)')
     }
   }
 
@@ -431,7 +432,7 @@ export default function AdminTorneoPage() {
   }
 
   const partiteGirone = partite.filter(p => ['girone','campionato','solo_campionato'].includes(p.fase))
-  const partiteElim   = partite.filter(p => ['quarti','semifinale','finale','terzo_posto'].includes(p.fase))
+  const partiteElim   = partite.filter(p => ['ottavi','quarti','semifinale','finale','terzo_posto'].includes(p.fase))
 
   const isSoloCampionato = torneo.tipo === 'solo_campionato'
   const tabs: [AdminTab, string][] = [
@@ -768,7 +769,7 @@ export default function AdminTorneoPage() {
           </button>
           <button onClick={avanzaFaseSuccessiva}
             className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-            ▶ Avanza fase successiva
+            → Avanza fase successiva
           </button>
         </div>
         <FaseFinaleTab
