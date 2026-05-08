@@ -369,63 +369,118 @@ function PartitaCard({ p, orario, primary }: { p: Partita; orario?: Date; primar
 function SchemaQualificazione({ gironi, squadre, partite, partiteElim, torneo, primary }: {
   gironi: any[]; squadre: any[]; partite: any[]; partiteElim: any[]; torneo: any; primary: string
 }) {
-  if (gironi.length === 0) return null
+  const schemaRaw = torneo.schema_eliminatoria
+  const schema: any[] = schemaRaw
+    ? (typeof schemaRaw === 'string' ? JSON.parse(schemaRaw) : schemaRaw)
+    : []
+
+  if (gironi.length === 0 && schema.length === 0 && partiteElim.length === 0) return null
+
   const nElim = torneo.n_squadre_eliminatoria ?? 4
   const nPerGirone = Math.max(1, Math.ceil(nElim / Math.max(gironi.length, 1)))
+  const faseLabel: Record<string,string> = {
+    ottavi:'Ottavi di finale', quarti:'Quarti di finale',
+    semifinale:'Semifinali', finale:'Finale', terzo_posto:'3°/4° posto'
+  }
+
+  // Tutte le fasi previste dallo schema o dalle partite generate
+  const fasiSchema = [...new Set(schema.map((m:any) => m.fase))]
+  const fasiGenerati = [...new Set(partiteElim.map((p:any) => p.fase))]
+  const tuttiLeFasi = [...new Set([...fasiSchema, ...fasiGenerati])]
+  const ordFasi = ['ottavi','quarti','semifinale','finale','terzo_posto']
+  tuttiLeFasi.sort((a,b) => ordFasi.indexOf(a) - ordFasi.indexOf(b))
+
+  // Calcola orari per le partite elim
+  const giornataElimId = torneo.giornata_eliminatoria_id
+  const orarioElimInizio = torneo.orario_eliminatoria || '09:00'
+
+  // Helper: etichetta slot anonima
+  function labelSlot(s: any): string {
+    if (!s) return '?'
+    if (s.tipo === 'girone') return `${s.pos}° Girone ${s.gironeNome}`
+    const refMatch = schema.find((m:any) => m.id === s.matchId)
+    const refLabel = refMatch?.label ?? s.matchId
+    return `${s.esito === 'vincente' ? 'Vincente' : 'Perdente'} ${refLabel}`
+  }
+
   return (
     <div className="bg-white rounded-xl border border-gray-200 overflow-hidden">
-      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2" style={{background:primary+'10'}}>
-        <span className="text-sm font-semibold text-gray-700">Schema qualificazione</span>
-        <span className="text-xs text-gray-400 ml-auto">Prime {nPerGirone} di ogni girone</span>
+      <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2" style={{ background: primary+'10' }}>
+        <span className="text-sm font-semibold text-gray-700">Fase eliminatoria</span>
+        {gironi.length > 0 && <span className="text-xs text-gray-400 ml-auto">Prime {nPerGirone} di ogni girone si qualificano</span>}
       </div>
-      <div className="p-4 overflow-x-auto">
-        <div className="flex gap-3 flex-wrap">
-          {gironi.map((g: any) => {
-            const sqG = squadre.filter((s: any) => s.girone_id === g.id)
-            const stats = calcolaClassifica(sqG, partite, g.id)
-            return (
-              <div key={g.id} className="min-w-[140px] flex-1">
-                <div className="text-xs font-semibold text-gray-500 mb-2 text-center">Girone {g.nome}</div>
-                {stats.slice(0, nPerGirone).map((s: any, i: number) => (
-                  <div key={s.squadra.id} className="flex items-center gap-1.5 mb-1 px-2 py-1 rounded-lg" style={{background:primary+'0d'}}>
-                    <span className="text-xs font-bold w-4 text-center" style={{color:primary}}>{i+1}°</span>
-                    <LogoSquadra squadra={s.squadra} size={16}/>
-                    <span className="text-xs font-medium truncate">{s.squadra.nome}</span>
-                    <span className="text-xs text-gray-400 ml-auto">{s.pt}pt</span>
-                  </div>
-                ))}
-                {stats.length === 0 && <div className="text-xs text-gray-400 text-center py-2">In attesa</div>}
+
+      <div className="divide-y divide-gray-50">
+        {tuttiLeFasi.map(fase => {
+          const partiteFase = partiteElim.filter((p:any) => p.fase === fase)
+          const matchFase = schema.filter((m:any) => m.fase === fase)
+          const haPartite = partiteFase.length > 0
+
+          return (
+            <div key={fase} className="p-4">
+              <div className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2.5">
+                {faseLabel[fase] ?? fase}
               </div>
-            )
-          })}
-        </div>
-        {partiteElim.length > 0 && (
-          <div className="mt-4 pt-4 border-t border-gray-100">
-            <div className="text-xs font-semibold text-gray-500 mb-3">Accoppiamenti</div>
-            <div className="flex gap-4 overflow-x-auto">
-              {(['ottavi','quarti','semifinale','finale','terzo_posto'] as const).map(fase => {
-                const pf = partiteElim.filter((p:any) => p.fase === fase)
-                if (pf.length === 0) return null
-                const lbl = {ottavi:'Ottavi',quarti:'Quarti',semifinale:'Semifinali',finale:'Finale',terzo_posto:'3°/4°'}[fase]
-                return (
-                  <div key={fase} className="min-w-[150px]">
-                    <div className="text-xs text-gray-400 text-center font-medium mb-2">{lbl}</div>
-                    {pf.map((p:any) => (
-                      <div key={p.id} className="border border-gray-200 rounded-lg overflow-hidden text-xs mb-2">
-                        {[{sq:p.squadra_casa,gol:p.gol_casa,win:p.giocata&&(p.gol_casa??0)>(p.gol_ospite??0)},{sq:p.squadra_ospite,gol:p.gol_ospite,win:p.giocata&&(p.gol_ospite??0)>(p.gol_casa??0)}].map((row,i) => (
-                          <div key={i} className={`flex items-center gap-1.5 px-2 py-1.5 ${i===0?'border-b border-gray-100':''}`} style={row.win?{background:primary+'0d',fontWeight:600}:{}}>
-                            <LogoSquadra squadra={row.sq ?? {nome:'?',logo_url:null}} size={16}/>
-                            <span className="flex-1 truncate">{(row.sq as any)?.nome ?? '–'}</span>
-                            {p.giocata && <span className="font-bold" style={row.win?{color:primary}:{color:'#9ca3af'}}>{row.gol}</span>}
+
+              {haPartite ? (
+                // Partite reali già generate — con orario calcolato
+                <div className="space-y-2">
+                  {partiteFase.map((p:any) => {
+                    const giornata = p.giornata_id
+                    return (
+                      <div key={p.id} className="border border-gray-200 rounded-xl overflow-hidden">
+                        {/* Info orario */}
+                        {(p.data_ora || giornata) && (
+                          <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                            {p.data_ora
+                              ? <span className="text-xs font-mono font-semibold" style={{ color: primary }}>
+                                  {new Date(p.data_ora).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })}
+                                </span>
+                              : <span className="text-xs text-gray-400">Orario da definire</span>
+                            }
+                            {p.campo && <span className="text-xs text-gray-400">· {(p.campo as any).nome}</span>}
+                          </div>
+                        )}
+                        {/* Squadre */}
+                        {[
+                          { sq: p.squadra_casa, gol: p.gol_casa, win: p.giocata && (p.gol_casa??0)>(p.gol_ospite??0) },
+                          { sq: p.squadra_ospite, gol: p.gol_ospite, win: p.giocata && (p.gol_ospite??0)>(p.gol_casa??0) }
+                        ].map((row, i) => (
+                          <div key={i} className={`flex items-center gap-2 px-3 py-2.5 ${i===0?'border-b border-gray-100':''}`}
+                            style={row.win ? { background: primary+'0d', fontWeight: 600 } : {}}>
+                            <LogoSquadra squadra={row.sq ?? {nome:'?',logo_url:null}} size={22}/>
+                            <span className="flex-1 text-sm truncate">{(row.sq as any)?.nome ?? '–'}</span>
+                            {p.giocata && <span className="text-sm font-bold" style={row.win?{color:primary}:{color:'#9ca3af'}}>{row.gol}</span>}
+                            {!p.giocata && <span className="text-xs text-gray-300">–</span>}
                           </div>
                         ))}
                       </div>
-                    ))}
-                  </div>
-                )
-              })}
+                    )
+                  })}
+                </div>
+              ) : (
+                // Schema anonimo — partite non ancora generate
+                <div className="space-y-1.5">
+                  {matchFase.map((m:any, idx:number) => (
+                    <div key={m.id} className="flex items-center gap-2 px-3 py-2 bg-gray-50 rounded-lg border border-gray-100">
+                      <span className="text-xs text-gray-400 w-4 text-center flex-shrink-0">{idx+1}</span>
+                      <span className="flex-1 text-sm text-gray-600 text-right">{labelSlot(m.casa)}</span>
+                      <span className="text-xs text-gray-400 px-2 flex-shrink-0">vs</span>
+                      <span className="flex-1 text-sm text-gray-600">{labelSlot(m.ospite)}</span>
+                    </div>
+                  ))}
+                  {matchFase.length === 0 && (
+                    <p className="text-xs text-gray-400 text-center py-2">
+                      Da definire in base ai risultati precedenti
+                    </p>
+                  )}
+                </div>
+              )}
             </div>
-          </div>
+          )
+        })}
+        {tuttiLeFasi.length === 0 && (
+          <div className="p-4 text-sm text-gray-400 text-center">Schema non ancora configurato</div>
         )}
       </div>
     </div>
