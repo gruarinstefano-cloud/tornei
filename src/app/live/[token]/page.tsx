@@ -262,42 +262,31 @@ function LiveRisultatoRow({ p, primary, onSave }: {
   }
 
   return (
-    <div className="border-b border-gray-50 last:border-0 px-3 py-3">
-      {(p.campo || p.girone) && (
-        <div className="text-xs text-gray-400 text-center mb-1.5">
-          {(p.campo as any)?.nome}{p.girone ? ` · Girone ${p.girone}` : ''}
-        </div>
+    <div className="px-4 py-3 border-b border-gray-50 last:border-0">
+      {p.campo && (
+        <div className="text-xs text-gray-400 mb-1.5">{(p.campo as any)?.nome} {p.girone ? `· Girone ${p.girone}` : ''}</div>
       )}
-      <div className="flex items-center">
-        {/* Squadra casa */}
-        <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
-          <LogoSquadra squadra={(p.squadra_casa as any) ?? { nome:'?', logo_url:null }} size={32}/>
-          <span className="text-xs font-medium text-gray-800 text-center leading-tight w-full px-1 line-clamp-2">
-            {(p.squadra_casa as any)?.nome ?? '–'}
-          </span>
+      <div className="flex items-center gap-3">
+        <div className="flex items-center gap-1.5 flex-1 justify-end">
+          <span className="text-sm font-medium truncate">{(p.squadra_casa as any)?.nome ?? '–'}</span>
+          <LogoSquadra squadra={(p.squadra_casa as any) ?? { nome:'?', logo_url:null }} size={24}/>
         </div>
-        {/* Input risultato */}
-        <div className="flex-shrink-0 mx-2 flex flex-col items-center gap-1.5">
-          <div className="flex items-center gap-1">
-            <input type="number" min="0" max="20" value={gc} onChange={e => setGc(+e.target.value)}
-              className="w-12 text-center px-1 py-1.5 border border-gray-300 rounded-lg text-sm font-bold focus:border-blue-400 focus:outline-none"/>
-            <span className="text-gray-400 text-sm">–</span>
-            <input type="number" min="0" max="20" value={go} onChange={e => setGo(+e.target.value)}
-              className="w-12 text-center px-1 py-1.5 border border-gray-300 rounded-lg text-sm font-bold focus:border-blue-400 focus:outline-none"/>
-          </div>
-          <button onClick={handleSave} disabled={saving}
-            className={`px-4 py-1 rounded-lg text-xs font-medium transition disabled:opacity-50 ${p.giocata ? 'bg-green-100 text-green-700' : 'text-white hover:opacity-90'}`}
-            style={!p.giocata ? { background: primary } : {}}>
-            {saving ? '...' : p.giocata ? '✓ Aggiorna' : 'Salva'}
-          </button>
+        <div className="flex items-center gap-1 flex-shrink-0">
+          <input type="number" min="0" max="20" value={gc} onChange={e => setGc(+e.target.value)}
+            className="w-12 text-center px-1 py-1.5 border border-gray-300 rounded-lg text-sm font-bold focus:border-blue-400 focus:outline-none"/>
+          <span className="text-gray-400 text-sm">–</span>
+          <input type="number" min="0" max="20" value={go} onChange={e => setGo(+e.target.value)}
+            className="w-12 text-center px-1 py-1.5 border border-gray-300 rounded-lg text-sm font-bold focus:border-blue-400 focus:outline-none"/>
         </div>
-        {/* Squadra ospite */}
-        <div className="flex flex-col items-center gap-1 flex-1 min-w-0">
-          <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={32}/>
-          <span className="text-xs font-medium text-gray-800 text-center leading-tight w-full px-1 line-clamp-2">
-            {(p.squadra_ospite as any)?.nome ?? '–'}
-          </span>
+        <div className="flex items-center gap-1.5 flex-1">
+          <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={24}/>
+          <span className="text-sm font-medium truncate">{(p.squadra_ospite as any)?.nome ?? '–'}</span>
         </div>
+        <button onClick={handleSave} disabled={saving}
+          className={`flex-shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition disabled:opacity-50 ${p.giocata ? 'bg-green-100 text-green-700 hover:bg-green-200' : 'text-white hover:opacity-90'}`}
+          style={!p.giocata ? { background: primary } : {}}>
+          {saving ? '...' : p.giocata ? '✓ Aggiorna' : 'Salva'}
+        </button>
       </div>
     </div>
   )

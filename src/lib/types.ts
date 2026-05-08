@@ -95,7 +95,7 @@ export type Partita = {
   campo_id: string | null
   girone_id: string | null
   giornata_id: string | null
-  fase: 'girone' | 'campionato' | 'quarti' | 'semifinale' | 'finale' | 'terzo_posto' | 'solo_campionato' | 'ottavi'
+  fase: 'girone' | 'campionato' | 'quarti' | 'semifinale' | 'finale' | 'terzo_posto' | 'solo_campionato' | 'ottavi' | 'ottavi'
   girone: string | null
   data_ora: string | null
   orario_calcolato: string | null

@@ -4,15 +4,11 @@ import type { Partita, Pausa, Campo, CalendarioItem, Giornata } from '@/lib/type
 import { calcolaOrariSlot, formatOra } from '@/lib/types'
 import LogoSquadra from './LogoSquadra'
 
-// CalendarioBoard: layout a colonne, una per campo.
-// Supporta drag & drop sia all'interno di un campo (riordino)
-// che tra campi diversi (spostamento campo).
-
 type Props = {
   campi: Campo[]
   giornata: Giornata
-  slotOrari: Record<string, string>   // campo_id -> HH:MM
-  itemsPerCampo: Record<string, CalendarioItem[]>  // campo_id -> items
+  slotOrari: Record<string, string>
+  itemsPerCampo: Record<string, CalendarioItem[]>
   durata: number
   durataElim: number
   tempoTecnico: number
@@ -23,18 +19,9 @@ type Props = {
   onUpdatePausa: (id: string, u: Partial<Pausa>) => void
 }
 
-type DragState = {
-  itemId: string
-  fromCampoId: string
-  fromIdx: number
-  kind: 'partita' | 'pausa'
-}
+type DragState = { itemId: string; fromCampoId: string; fromIdx: number; kind: 'partita' | 'pausa' }
 
-export default function CalendarioBoard({
-  campi, giornata, slotOrari, itemsPerCampo,
-  durata, durataElim, tempoTecnico,
-  onReorder, onMoveCampo, onAddPausa, onDeletePausa, onUpdatePausa
-}: Props) {
+export default function CalendarioBoard({ campi, giornata, slotOrari, itemsPerCampo, durata, durataElim, tempoTecnico, onReorder, onMoveCampo, onAddPausa, onDeletePausa, onUpdatePausa }: Props) {
   const [drag, setDrag] = useState<DragState | null>(null)
   const [overCampo, setOverCampo] = useState<string | null>(null)
   const [overIdx, setOverIdx] = useState<number | null>(null)
@@ -46,12 +33,8 @@ export default function CalendarioBoard({
   function handleDragEnd() {
     if (!drag) return
     if (overCampo && overCampo !== drag.fromCampoId) {
-      // Sposta su altro campo
-      if (drag.kind === 'partita') {
-        onMoveCampo(drag.itemId, overCampo)
-      }
+      if (drag.kind === 'partita') onMoveCampo(drag.itemId, overCampo)
     } else if (overCampo === drag.fromCampoId && overIdx !== null && overIdx !== drag.fromIdx) {
-      // Riordina nello stesso campo
       const items = [...(itemsPerCampo[drag.fromCampoId] ?? [])]
       const [moved] = items.splice(drag.fromIdx, 1)
       items.splice(overIdx, 0, moved)
@@ -73,34 +56,25 @@ export default function CalendarioBoard({
             onDragOver={e => { e.preventDefault(); setOverCampo(campo.id) }}
             onDragLeave={() => { if (overCampo === campo.id) setOverCampo(null) }}
             className={`bg-white rounded-xl border overflow-hidden transition-all ${isOver && drag && drag.fromCampoId !== campo.id ? 'border-blue-400 shadow-md' : 'border-gray-200'}`}>
-            {/* Header campo */}
-            <div className="px-3 py-2.5 flex items-center gap-2 border-b border-gray-100"
-              style={{ background: campo.colore + '15' }}>
+            <div className="px-3 py-2.5 flex items-center gap-2 border-b border-gray-100" style={{ background: campo.colore + '15' }}>
               <span className="w-2.5 h-2.5 rounded-full flex-shrink-0" style={{ background: campo.colore }}/>
               <span className="font-semibold text-sm text-gray-800 flex-1 truncate">{campo.nome}</span>
               <span className="text-xs text-gray-400">{slotOrario}</span>
             </div>
 
-            {/* Drop overlay quando si trascina da altro campo */}
             {isOver && drag && drag.fromCampoId !== campo.id && (
-              <div className="px-3 py-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-600 text-center">
-                Rilascia per spostare qui
-              </div>
+              <div className="px-3 py-2 bg-blue-50 border-b border-blue-100 text-xs text-blue-600 text-center">Rilascia per spostare qui</div>
             )}
 
-            {/* Lista items */}
             <div className="divide-y divide-gray-50 min-h-[48px]">
               {items.length === 0 && (
-                <div className="px-3 py-4 text-center text-xs text-gray-400">
-                  {isOver && drag ? '↓ Rilascia qui' : 'Nessuna partita'}
-                </div>
+                <div className="px-3 py-4 text-center text-xs text-gray-400">{isOver && drag ? '↓ Rilascia qui' : 'Nessuna partita'}</div>
               )}
               {items.map((item, i) => {
                 const orario = item.kind === 'partita' ? orariMap.get(item.data.id) : null
                 const isDragging = drag?.itemId === item.data.id
                 return (
-                  <div key={item.data.id}
-                    draggable
+                  <div key={item.data.id} draggable
                     onDragStart={() => handleDragStart(item, campo.id, i)}
                     onDragEnd={handleDragEnd}
                     onDragEnter={() => { setOverCampo(campo.id); setOverIdx(i) }}
@@ -109,25 +83,16 @@ export default function CalendarioBoard({
                     style={{ cursor: 'grab' }}>
                     {item.kind === 'partita'
                       ? <PartitaRow p={item.data} orario={orario ?? undefined}/>
-                      : <PausaRow p={item.data}
-                          onDelete={() => onDeletePausa(item.data.id)}
-                          onUpdate={u => onUpdatePausa(item.data.id, u)}/>
+                      : <PausaRow p={item.data} onDelete={() => onDeletePausa(item.data.id)} onUpdate={u => onUpdatePausa(item.data.id, u)}/>
                     }
                   </div>
                 )
               })}
             </div>
 
-            {/* Footer: aggiungi pausa */}
             <div className="px-3 py-2 border-t border-gray-100 flex gap-2">
-              <button onClick={() => onAddPausa(campo.id, 'blocco')}
-                className="text-xs px-2 py-1 border border-amber-200 text-amber-700 rounded hover:bg-amber-50 transition">
-                + Pausa
-              </button>
-              <button onClick={() => onAddPausa(campo.id, 'separatore')}
-                className="text-xs px-2 py-1 border border-gray-200 text-gray-500 rounded hover:bg-gray-50 transition">
-                + Separatore
-              </button>
+              <button onClick={() => onAddPausa(campo.id, 'blocco')} className="text-xs px-2 py-1 border border-amber-200 text-amber-700 rounded hover:bg-amber-50">+ Pausa</button>
+              <button onClick={() => onAddPausa(campo.id, 'separatore')} className="text-xs px-2 py-1 border border-gray-200 text-gray-500 rounded hover:bg-gray-50">+ Sep.</button>
             </div>
           </div>
         )
@@ -141,7 +106,6 @@ function PartitaRow({ p, orario }: { p: Partita; orario?: Date }) {
   const nomeOspite = (p.squadra_ospite as any)?.nome ?? '–'
   return (
     <div className="hover:bg-gray-50 select-none px-2 py-2">
-      {/* Desktop: riga unica */}
       <div className="hidden sm:flex items-center gap-1.5">
         <span className="text-gray-300 text-xs flex-shrink-0 cursor-grab">⠿</span>
         {orario && <span className="text-xs font-mono text-blue-600 w-9 flex-shrink-0">{formatOra(orario)}</span>}
@@ -153,7 +117,6 @@ function PartitaRow({ p, orario }: { p: Partita; orario?: Date }) {
         <span className="text-xs font-medium flex-1" title={nomeOspite}>{nomeOspite}</span>
         <LogoSquadra squadra={(p.squadra_ospite as any) ?? { nome:'?', logo_url:null }} size={18}/>
       </div>
-      {/* Mobile: centrato verticale */}
       <div className="flex sm:hidden items-center gap-1">
         <span className="text-gray-300 text-xs flex-shrink-0 cursor-grab">⠿</span>
         {orario && <span className="text-xs font-mono text-blue-600 w-8 flex-shrink-0">{formatOra(orario)}</span>}

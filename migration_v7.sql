@@ -1,38 +1,41 @@
--- =========================================
--- MIGRAZIONE v7 — Torneo multi-giorno
--- Esegui in Supabase > SQL Editor
--- =========================================
-
--- Tabella giornate: ogni riga è un giorno del torneo
-create table if not exists public.giornate (
-  id uuid default gen_random_uuid() primary key,
-  torneo_id uuid references public.tornei(id) on delete cascade not null,
-  data date not null,
-  ordine int default 0
+-- v7: giornate multi-giorno
+CREATE TABLE IF NOT EXISTS public.giornate (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  torneo_id uuid REFERENCES public.tornei(id) ON DELETE CASCADE NOT NULL,
+  data date NOT NULL,
+  ordine int DEFAULT 0
 );
-alter table public.giornate enable row level security;
-create policy "Giornate visibili a tutti" on public.giornate for select using (true);
-create policy "Giornate gestibili dall'admin" on public.giornate for all using (
-  exists (select 1 from public.tornei t where t.id = torneo_id and t.admin_id = auth.uid())
+ALTER TABLE public.giornate ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "Giornate visibili a tutti" ON public.giornate FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Giornate gestibili dall'admin" ON public.giornate FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.tornei t WHERE t.id = torneo_id AND t.admin_id = auth.uid())
 );
-create index if not exists idx_giornate_torneo on public.giornate(torneo_id);
-
--- Tabella slot_campo: orario di inizio per ogni campo in ogni giornata
-create table if not exists public.slot_campo (
-  id uuid default gen_random_uuid() primary key,
-  torneo_id uuid references public.tornei(id) on delete cascade not null,
-  giornata_id uuid references public.giornate(id) on delete cascade not null,
-  campo_id uuid references public.campi(id) on delete cascade not null,
-  orario_inizio time not null default '09:00',
-  unique(giornata_id, campo_id)
+CREATE TABLE IF NOT EXISTS public.slot_campo (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  torneo_id uuid REFERENCES public.tornei(id) ON DELETE CASCADE NOT NULL,
+  giornata_id uuid REFERENCES public.giornate(id) ON DELETE CASCADE NOT NULL,
+  campo_id uuid REFERENCES public.campi(id) ON DELETE CASCADE NOT NULL,
+  orario_inizio time NOT NULL DEFAULT '09:00',
+  UNIQUE(giornata_id, campo_id)
 );
-alter table public.slot_campo enable row level security;
-create policy "SlotCampo visibili a tutti" on public.slot_campo for select using (true);
-create policy "SlotCampo gestibili dall'admin" on public.slot_campo for all using (
-  exists (select 1 from public.tornei t where t.id = torneo_id and t.admin_id = auth.uid())
+ALTER TABLE public.slot_campo ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "SlotCampo visibili a tutti" ON public.slot_campo FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "SlotCampo gestibili dall'admin" ON public.slot_campo FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.tornei t WHERE t.id = torneo_id AND t.admin_id = auth.uid())
 );
-create index if not exists idx_slot_campo_giornata on public.slot_campo(giornata_id);
-
--- Aggiunge giornata_id a partite e pause
-alter table public.partite add column if not exists giornata_id uuid references public.giornate(id) on delete set null;
-alter table public.pause add column if not exists giornata_id uuid references public.giornate(id) on delete cascade;
+CREATE TABLE IF NOT EXISTS public.pause (
+  id uuid DEFAULT gen_random_uuid() PRIMARY KEY,
+  torneo_id uuid REFERENCES public.tornei(id) ON DELETE CASCADE NOT NULL,
+  campo_id uuid REFERENCES public.campi(id) ON DELETE CASCADE NOT NULL,
+  giornata_id uuid REFERENCES public.giornate(id) ON DELETE SET NULL,
+  etichetta text NOT NULL DEFAULT 'Pausa',
+  durata_minuti int DEFAULT 15,
+  tipo text NOT NULL DEFAULT 'blocco' CHECK (tipo IN ('blocco','separatore')),
+  colore text DEFAULT '#f59e0b',
+  ordine_calendario int DEFAULT 0
+);
+ALTER TABLE public.pause ENABLE ROW LEVEL SECURITY;
+CREATE POLICY IF NOT EXISTS "Pause visibili a tutti" ON public.pause FOR SELECT USING (true);
+CREATE POLICY IF NOT EXISTS "Pause gestibili dall'admin" ON public.pause FOR ALL USING (
+  EXISTS (SELECT 1 FROM public.tornei t WHERE t.id = torneo_id AND t.admin_id = auth.uid())
+);

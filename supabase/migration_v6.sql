@@ -1,16 +1,23 @@
--- =========================================
--- MIGRAZIONE v6 — Orari, tempo tecnico, durata fasi
--- Esegui in Supabase > SQL Editor
--- =========================================
-
--- Aggiunge data inizio e orario di inizio per campo
-alter table public.tornei add column if not exists data_inizio date;
-alter table public.tornei add column if not exists durata_partita_eliminazione_minuti int default 20;
-alter table public.tornei add column if not exists tempo_tecnico_minuti int default 5;
-
--- Orario di inizio per ogni campo (indipendente)
-alter table public.campi add column if not exists orario_inizio time default '09:00';
-alter table public.campi add column if not exists data_inizio date;
-
--- Aggiunge colonna orario calcolato alle partite
-alter table public.partite add column if not exists orario_calcolato timestamptz;
+-- v6: andata_ritorno, solo_campionato, durata eliminazione, tempo tecnico
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS andata_ritorno boolean DEFAULT false;
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS durata_partita_eliminazione_minuti int DEFAULT 20;
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS tempo_tecnico_minuti int DEFAULT 5;
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS finale_terzo_posto boolean DEFAULT false;
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS luogo text;
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS info_testo text;
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS giornata_eliminatoria_id uuid references public.giornate(id) on delete set null;
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS orario_eliminatoria time;
+ALTER TABLE public.tornei ADD COLUMN IF NOT EXISTS schema_eliminatoria jsonb;
+ALTER TABLE public.tornei DROP CONSTRAINT IF EXISTS tornei_tipo_check;
+ALTER TABLE public.tornei ADD CONSTRAINT tornei_tipo_check CHECK (tipo IN ('gironi_eliminazione','campionato_eliminazione','solo_campionato'));
+ALTER TABLE public.partite ADD COLUMN IF NOT EXISTS giornata_id uuid references public.giornate(id) on delete set null;
+ALTER TABLE public.partite ADD COLUMN IF NOT EXISTS ordine_calendario int DEFAULT 0;
+ALTER TABLE public.partite ADD COLUMN IF NOT EXISTS orario_calcolato timestamptz;
+ALTER TABLE public.partite DROP CONSTRAINT IF EXISTS partite_fase_check;
+ALTER TABLE public.partite ADD CONSTRAINT partite_fase_check CHECK (fase IN ('girone','campionato','solo_campionato','ottavi','quarti','semifinale','finale','terzo_posto'));
+ALTER TABLE public.squadre ADD COLUMN IF NOT EXISTS logo_url text;
+ALTER TABLE public.squadre ADD COLUMN IF NOT EXISTS girone_id uuid references public.gironi(id) on delete set null;
+ALTER TABLE public.campi ADD COLUMN IF NOT EXISTS colore text DEFAULT '#3b82f6';
+ALTER TABLE public.campi ADD COLUMN IF NOT EXISTS ordine int DEFAULT 0;
+ALTER TABLE public.campi ADD COLUMN IF NOT EXISTS orario_inizio time DEFAULT '09:00';
+ALTER TABLE public.campi ADD COLUMN IF NOT EXISTS data_inizio date;
