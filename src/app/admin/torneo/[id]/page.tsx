@@ -231,31 +231,32 @@ export default function AdminTorneoPage() {
     const giornataElim = (torneo as any).giornata_eliminatoria_id ?? giornate[giornate.length-1]?.id ?? null
     const schemaRaw = (torneo as any).schema_eliminatoria
 
-    // Calcola classifiche per risolvere i slot dai gironi
     const classifiche: Record<string, any[]> = {}
     for (const g of gironi) classifiche[g.id] = calcolaClassifica(squadre, partite, g.id)
     const gironeByNome: Record<string, string> = {}
     gironi.forEach(g => { gironeByNome[g.nome] = g.id })
 
-    // Risolve uno slot in una squadra se possibile (solo slot da girone risolvibili subito)
     function risolviSlotGirone(slot: any): any | null {
       if (slot.tipo !== 'girone') return null
       const gid = gironeByNome[slot.gironeNome]
       if (!gid) return null
-      const cl = classifiche[gid] ?? []
-      return cl[slot.pos - 1]?.squadra ?? null
+      return (classifiche[gid] ?? [])[slot.pos - 1]?.squadra ?? null
     }
 
     const toInsert: any[] = []
 
     if (schemaRaw) {
       const schema: any[] = typeof schemaRaw === 'string' ? JSON.parse(schemaRaw) : schemaRaw
-      // Genera SOLO le partite dove entrambi gli slot vengono dai gironi (prima fase)
-      // Le fasi successive (semifinali, finale) si generano dopo i risultati
-      schema.forEach((m: any, i: number) => {
+      // Determina la prima fase del bracket
+      const ordFasi = ['ottavi','quarti','semifinale','finale','terzo_posto']
+      const fasiSchema = [...new Set(schema.map((m:any) => m.fase))]
+      fasiSchema.sort((a,b) => ordFasi.indexOf(a) - ordFasi.indexOf(b))
+      const primaFase = fasiSchema[0]
+      // Genera SOLO le partite della prima fase (slot da gironi)
+      schema.filter((m:any) => m.fase === primaFase).forEach((m: any, i: number) => {
         const casa = risolviSlotGirone(m.casa)
         const ospite = risolviSlotGirone(m.ospite)
-        if (!casa || !ospite) return // skip: dipende da risultati precedenti
+        if (!casa || !ospite) return
         toInsert.push({
           torneo_id: id, squadra_casa_id: casa.id, squadra_ospite_id: ospite.id,
           fase: m.fase, girone: null, girone_id: null, giocata: false,
@@ -265,12 +266,14 @@ export default function AdminTorneoPage() {
     }
 
     if (toInsert.length === 0) {
-      // Fallback generazione automatica
+      // Fallback: genera SOLO i quarti o semifinali (prima fase), NON finale/3°4°
       const nElim = (torneo.n_squadre_eliminatoria as number) ?? 4
       const nPerGirone = Math.ceil(nElim / Math.max(gironi.length, 1))
-      const acc = generaEliminatoria(gironi, classifiche, nPerGirone, torneo.finale_terzo_posto ?? false)
-      if (acc.length === 0) { showMsg('Nessun accoppiamento generabile. Inserisci prima i risultati dei gironi.', 'err'); return }
-      toInsert.push(...acc.map((a,i) => ({
+      const faseIniziale = nElim >= 16 ? 'ottavi' : nElim >= 8 ? 'quarti' : 'semifinale'
+      const acc = generaEliminatoria(gironi, classifiche, nPerGirone, false) // false = no 3°/4° adesso
+      const accPrimaFase = acc.filter(a => a.fase === faseIniziale)
+      if (accPrimaFase.length === 0) { showMsg('Nessun accoppiamento generabile. Inserisci prima i risultati dei gironi.', 'err'); return }
+      toInsert.push(...accPrimaFase.map((a,i) => ({
         torneo_id: id, squadra_casa_id: a.casa.id, squadra_ospite_id: a.ospite.id,
         fase: a.fase, girone: null, girone_id: null, giocata: false,
         ordine_calendario: i, giornata_id: giornataElim
@@ -286,7 +289,85 @@ export default function AdminTorneoPage() {
         ...prev.filter(p => !['ottavi','quarti','semifinale','finale','terzo_posto'].includes(p.fase)),
         ...(data as Partita[])
       ])
-      showMsg(`Eliminatoria generata! ${toInsert.length} partite create.`)
+      showMsg(`${toInsert.length} partite generate! Inserisci i risultati per avanzare alla fase successiva.`)
+    }
+  }
+
+  async function avanzaFaseSuccessiva() {
+    // Genera le partite della fase successiva in base ai risultati di quella corrente
+    const sb = createClient()
+    const giornataElim = (torneo as any).giornata_eliminatoria_id ?? giornate[giornate.length-1]?.id ?? null
+    const schemaRaw = (torneo as any).schema_eliminatoria
+    if (!schemaRaw) { showMsg('Configura prima lo schema nelle Impostazioni.', 'err'); return }
+
+    const schema: any[] = typeof schemaRaw === 'string' ? JSON.parse(schemaRaw) : schemaRaw
+    const ordFasi = ['ottavi','quarti','semifinale','finale','terzo_posto']
+
+    // Trova la fase corrente (ultima con partite generate)
+    const fasiGenerati = [...new Set(partite.filter(p => ordFasi.includes(p.fase)).map(p => p.fase))]
+    fasiGenerati.sort((a,b) => ordFasi.indexOf(a) - ordFasi.indexOf(b))
+    const faseCorrente = fasiGenerati[fasiGenerati.length - 1]
+    if (!faseCorrente) { showMsg('Genera prima la fase iniziale.', 'err'); return }
+
+    // Verifica che tutte le partite della fase corrente siano giocate
+    const partiteFaseCorrente = partite.filter(p => p.fase === faseCorrente)
+    const nonGiocate = partiteFaseCorrente.filter(p => !p.giocata)
+    if (nonGiocate.length > 0) {
+      showMsg(`Inserisci prima tutti i risultati dei ${faseCorrente === 'ottavi' ? 'ottavi' : faseCorrente === 'quarti' ? 'quarti' : 'semifinali'} (${nonGiocate.length} mancanti).`, 'err')
+      return
+    }
+
+    // Trova le partite della fase successiva nello schema
+    const idxCorrente = ordFasi.indexOf(faseCorrente)
+    const fasiSuccessive = ordFasi.slice(idxCorrente + 1).filter(f => schema.some((m:any) => m.fase === f))
+    if (fasiSuccessive.length === 0) { showMsg('Non ci sono altre fasi da generare.', 'err'); return }
+    const faseSuccessiva = fasiSuccessive[0]
+
+    // Mappa matchId -> vincente/perdente basato sui risultati reali
+    // Associa ogni partita schema alla partita reale per ordine
+    const partiteFaseSchemaOrd = schema.filter((m:any) => m.fase === faseCorrente)
+    const partiteFaseRealiOrd = [...partiteFaseCorrente].sort((a,b) => a.ordine_calendario - b.ordine_calendario)
+
+    const matchResults: Record<string, { vincente: any; perdente: any }> = {}
+    partiteFaseSchemaOrd.forEach((m:any, i:number) => {
+      const reale = partiteFaseRealiOrd[i]
+      if (!reale || !reale.giocata) return
+      const gcasa = reale.gol_casa ?? 0, gospite = reale.gol_ospite ?? 0
+      matchResults[m.id] = {
+        vincente: gcasa >= gospite ? reale.squadra_casa : reale.squadra_ospite,
+        perdente: gcasa >= gospite ? reale.squadra_ospite : reale.squadra_casa,
+      }
+    })
+
+    // Genera le partite della fase successiva
+    const toInsert: any[] = []
+    schema.filter((m:any) => m.fase === faseSuccessiva).forEach((m:any, i:number) => {
+      function risolviSlot(slot: any): any | null {
+        if (slot.tipo === 'match') {
+          const res = matchResults[slot.matchId]
+          return res ? res[slot.esito as 'vincente'|'perdente'] : null
+        }
+        return null
+      }
+      const casa = risolviSlot(m.casa)
+      const ospite = risolviSlot(m.ospite)
+      if (!casa || !ospite) return
+      toInsert.push({
+        torneo_id: id, squadra_casa_id: (casa as any).id, squadra_ospite_id: (ospite as any).id,
+        fase: m.fase, girone: null, girone_id: null, giocata: false,
+        ordine_calendario: i, giornata_id: giornataElim
+      })
+    })
+
+    if (toInsert.length === 0) { showMsg('Impossibile generare la fase successiva. Verifica lo schema.', 'err'); return }
+
+    const { data, error } = await sb.from('partite').insert(toInsert)
+      .select('*, squadra_casa:squadre!squadra_casa_id(*), squadra_ospite:squadre!squadra_ospite_id(*), campo:campi(*)')
+    if (error) showMsg('Errore: ' + error.message, 'err')
+    else {
+      setPartite(prev => [...prev, ...(data as Partita[])])
+      const lbl = { quarti:'Quarti', semifinale:'Semifinali', finale:'Finale', terzo_posto:'3°/4° posto', ottavi:'Ottavi' }
+      showMsg(`${lbl[faseSuccessiva as keyof typeof lbl] ?? faseSuccessiva} generati! (${toInsert.length} partite)`)
     }
   }
 
@@ -680,6 +761,16 @@ export default function AdminTorneoPage() {
 
       {/* ELIMINATORIA */}
       {tab === 'eliminatoria' && (
+        <div className="space-y-3 mb-4 flex gap-3 flex-wrap">
+          <button onClick={generaFaseEliminatoria}
+            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
+            ⚡ Genera prima fase dai gironi
+          </button>
+          <button onClick={avanzaFaseSuccessiva}
+            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+            ▶ Avanza fase successiva
+          </button>
+        </div>
         <FaseFinaleTab
           torneo={torneo} squadre={squadre} gironi={gironi}
           partite={partite} campi={campi} giornate={giornate}
