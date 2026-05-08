@@ -762,21 +762,23 @@ export default function AdminTorneoPage() {
 
       {/* ELIMINATORIA */}
       {tab === 'eliminatoria' && (
-        <div className="space-y-3 mb-4 flex gap-3 flex-wrap">
-          <button onClick={generaFaseEliminatoria}
-            className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
-            ⚡ Genera prima fase dai gironi
-          </button>
-          <button onClick={avanzaFaseSuccessiva}
-            className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
-            → Avanza fase successiva
-          </button>
+        <div className="space-y-4">
+          <div className="flex gap-3 flex-wrap">
+            <button onClick={generaFaseEliminatoria}
+              className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700">
+              ⚡ Genera prima fase dai gironi
+            </button>
+            <button onClick={avanzaFaseSuccessiva}
+              className="px-4 py-2 bg-blue-600 text-white rounded-lg text-sm font-medium hover:bg-blue-700">
+              → Avanza fase successiva
+            </button>
+          </div>
+          <FaseFinaleTab
+            torneo={torneo} squadre={squadre} gironi={gironi}
+            partite={partite} campi={campi} giornate={giornate}
+            torneoId={id}
+            onPartiteChange={setPartite}/>
         </div>
-        <FaseFinaleTab
-          torneo={torneo} squadre={squadre} gironi={gironi}
-          partite={partite} campi={campi} giornate={giornate}
-          torneoId={id}
-          onPartiteChange={setPartite}/>
       )}
 
       {/* BANNER */}
