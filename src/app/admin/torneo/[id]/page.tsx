@@ -250,12 +250,12 @@ export default function AdminTorneoPage() {
 
     if (schemaRaw) {
       const schema: any[] = typeof schemaRaw === 'string' ? JSON.parse(schemaRaw) : schemaRaw
-      // Solo la prima fase (slot da girone) è risolvibile adesso
-      // Le fasi successive dipendono dai risultati → vengono inserite come TBD
+      // Genera SOLO le partite dove entrambi gli slot vengono dai gironi (prima fase)
+      // Le fasi successive (semifinali, finale) si generano dopo i risultati
       schema.forEach((m: any, i: number) => {
         const casa = risolviSlotGirone(m.casa)
         const ospite = risolviSlotGirone(m.ospite)
-        if (!casa || !ospite) return // skip slot da match precedenti
+        if (!casa || !ospite) return // skip: dipende da risultati precedenti
         toInsert.push({
           torneo_id: id, squadra_casa_id: casa.id, squadra_ospite_id: ospite.id,
           fase: m.fase, girone: null, girone_id: null, giocata: false,
@@ -555,7 +555,7 @@ export default function AdminTorneoPage() {
               {gironi.map(g => {
                 const sqGirone = squadre.filter(s => s.girone_id === g.id)
                 const ptGirone = partite.filter(p => p.girone_id === g.id)
-                const stats = sqGirone.map(sq => {
+                const statsCalc = sqGirone.map(sq => {
                   const mine = ptGirone.filter(p =>
                     p.giocata && (p.squadra_casa_id === sq.id || p.squadra_ospite_id === sq.id)
                   )
@@ -569,6 +569,8 @@ export default function AdminTorneoPage() {
                   })
                   return { squadra: sq, g: mine.length, v, p: par, s, gf, gs, pt: v*3+par }
                 }).sort((a,b) => b.pt-a.pt || (b.gf-b.gs)-(a.gf-a.gs) || b.gf-a.gf)
+                // Assicura che tutte le squadre appaiano anche con 0 punti
+                const stats = sqGirone.map(sq => statsCalc.find(s => s.squadra.id === sq.id) ?? { squadra:sq, g:0, v:0, p:0, s:0, gf:0, gs:0, pt:0 }).sort((a,b) => b.pt-a.pt || (b.gf-b.gs)-(a.gf-a.gs) || b.gf-a.gf)
 
                 return (
                   <div key={g.id} className="bg-white rounded-xl border border-gray-200 overflow-hidden">
