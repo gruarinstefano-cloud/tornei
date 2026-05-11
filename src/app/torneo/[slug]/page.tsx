@@ -114,7 +114,7 @@ export default function TorneoPage() {
         {tab === 'partite' && (
           <div className="space-y-6">
             {!isSoloCampionato && gironiObj.length > 0 && (
-              <SchemaQualificazione gironi={gironiObj} squadre={squadre} partite={partite} partiteElim={partiteElim} torneo={torneo} primary={primary}/>
+              <SchemaQualificazione gironi={gironiObj} squadre={squadre} partite={partite} partiteElim={partiteElim} torneo={torneo} primary={primary} giornate={giornate}/>
             )}
             {(giornate.length > 0 ? giornate : [null]).map(giornata => {
               const gId = giornata?.id ?? null
@@ -244,7 +244,7 @@ export default function TorneoPage() {
         {tab === 'tabellone' && (
           <div className="space-y-5">
             {gironiObj.length > 0 && (
-              <SchemaQualificazione gironi={gironiObj} squadre={squadre} partite={partite} partiteElim={partiteElim} torneo={torneo} primary={primary}/>
+              <SchemaQualificazione gironi={gironiObj} squadre={squadre} partite={partite} partiteElim={partiteElim} torneo={torneo} primary={primary} giornate={giornate}/>
             )}
             {partiteElim.length === 0 ? (
               <div className="bg-white rounded-xl border border-gray-200 p-6 text-center text-gray-400">Gli accoppiamenti saranno disponibili al termine della fase a gironi</div>
@@ -366,8 +366,8 @@ function PartitaCard({ p, orario, primary }: { p: Partita; orario?: Date; primar
   )
 }
 
-function SchemaQualificazione({ gironi, squadre, partite, partiteElim, torneo, primary }: {
-  gironi: any[]; squadre: any[]; partite: any[]; partiteElim: any[]; torneo: any; primary: string
+function SchemaQualificazione({ gironi, squadre, partite, partiteElim, torneo, primary, giornate }: {
+  gironi: any[]; squadre: any[]; partite: any[]; partiteElim: any[]; torneo: any; primary: string; giornate?: any[]
 }) {
   const schemaRaw = torneo.schema_eliminatoria
   const schema: any[] = schemaRaw
@@ -410,6 +410,22 @@ function SchemaQualificazione({ gironi, squadre, partite, partiteElim, torneo, p
         {gironi.length > 0 && <span className="text-xs text-gray-400 ml-auto">Prime {nPerGirone} di ogni girone si qualificano</span>}
       </div>
 
+      {/* Orario e giornata della fase eliminatoria dalle impostazioni */}
+      {torneo.giornata_eliminatoria_id && (
+        <div className="px-4 py-2 bg-gray-50 border-b border-gray-100 flex items-center gap-3">
+          <span className="text-xs text-gray-500">
+            📅 {(() => {
+              const gEl = giornate?.find((g:any) => g.id === torneo.giornata_eliminatoria_id)
+              return gEl ? formatDataBreve(gEl.data) : ''
+            })()}
+          </span>
+          {torneo.orario_eliminatoria && (
+            <span className="text-xs font-mono font-semibold" style={{ color: primary }}>
+              🕐 {String(torneo.orario_eliminatoria).slice(0,5)}
+            </span>
+          )}
+        </div>
+      )}
       <div className="divide-y divide-gray-50">
         {tuttiLeFasi.map(fase => {
           const partiteFase = partiteElim.filter((p:any) => p.fase === fase)
@@ -423,24 +439,24 @@ function SchemaQualificazione({ gironi, squadre, partite, partiteElim, torneo, p
               </div>
 
               {haPartite ? (
-                // Partite reali già generate — con orario calcolato
                 <div className="space-y-2">
                   {partiteFase.map((p:any) => {
-                    const giornata = p.giornata_id
                     return (
                       <div key={p.id} className="border border-gray-200 rounded-xl overflow-hidden">
-                        {/* Info orario */}
-                        {(p.data_ora || giornata) && (
-                          <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
-                            {p.data_ora
+                        {/* Info orario — usa data_ora se disponibile, altrimenti orario_eliminatoria */}
+                        <div className="px-3 py-1.5 bg-gray-50 border-b border-gray-100 flex items-center gap-2">
+                          {p.data_ora
+                            ? <span className="text-xs font-mono font-semibold" style={{ color: primary }}>
+                                {new Date(p.data_ora).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })}
+                              </span>
+                            : torneo.orario_eliminatoria
                               ? <span className="text-xs font-mono font-semibold" style={{ color: primary }}>
-                                  {new Date(p.data_ora).toLocaleTimeString('it-IT', { hour:'2-digit', minute:'2-digit' })}
+                                  {String(torneo.orario_eliminatoria).slice(0,5)}
                                 </span>
                               : <span className="text-xs text-gray-400">Orario da definire</span>
-                            }
-                            {p.campo && <span className="text-xs text-gray-400">· {(p.campo as any).nome}</span>}
-                          </div>
-                        )}
+                          }
+                          {p.campo && <span className="text-xs text-gray-400">· {(p.campo as any).nome}</span>}
+                        </div>
                         {/* Squadre */}
                         {[
                           { sq: p.squadra_casa, gol: p.gol_casa, win: p.giocata && (p.gol_casa??0)>(p.gol_ospite??0) },

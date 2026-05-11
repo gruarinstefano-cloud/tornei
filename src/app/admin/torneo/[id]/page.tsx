@@ -294,13 +294,64 @@ export default function AdminTorneoPage() {
   }
 
   async function avanzaFaseSuccessiva() {
-    // Genera le partite della fase successiva in base ai risultati di quella corrente
     const sb = createClient()
     const giornataElim = (torneo as any).giornata_eliminatoria_id ?? giornate[giornate.length-1]?.id ?? null
     const schemaRaw = (torneo as any).schema_eliminatoria
-    if (!schemaRaw) { showMsg('Configura prima lo schema nelle Impostazioni.', 'err'); return }
 
-    const schema: any[] = typeof schemaRaw === 'string' ? JSON.parse(schemaRaw) : schemaRaw
+    // Se non c'è schema configurato, genera uno schema default automatico
+    const nElimDefault = (torneo.n_squadre_eliminatoria as number) ?? 4
+    const nPerGironeDefault = Math.max(1, Math.ceil(nElimDefault / Math.max(gironi.length, 1)))
+    const ordFasiAll = ['ottavi','quarti','semifinale','finale','terzo_posto']
+
+    // Build default schema inline if none exists
+    function buildSchemaDefault(): any[] {
+      const qualificate: any[] = []
+      for (let pos = 1; pos <= nPerGironeDefault; pos++)
+        for (const g of gironi)
+          qualificate.push({ tipo:'girone', pos, gironeNome: g.nome })
+      const matches: any[] = []
+      let counter = 1
+      const nPrima = nElimDefault >= 16 ? 8 : nElimDefault >= 8 ? 4 : nElimDefault >= 4 ? 2 : 1
+      const primaFase = nElimDefault >= 16 ? 'ottavi' : nElimDefault >= 8 ? 'quarti' : 'semifinale'
+      const q = [...qualificate], n = q.length
+      for (let i = 0; i < nPrima && i < Math.floor(n/2); i++) {
+        matches.push({ id:`m${counter}`, label:`Match ${counter}`, fase:primaFase, casa:q[i], ospite:q[n-1-i] })
+        counter++
+      }
+      // Semifinali se c'erano quarti/ottavi
+      if (nElimDefault >= 8) {
+        const primaMatches = matches.filter((m:any) => m.fase === primaFase)
+        for (let i = 0; i < Math.floor(primaMatches.length/2); i++) {
+          matches.push({ id:`m${counter}`, label:`Match ${counter}`, fase:'semifinale',
+            casa:{tipo:'match',matchId:primaMatches[i*2].id,esito:'vincente'},
+            ospite:{tipo:'match',matchId:primaMatches[i*2+1].id,esito:'vincente'} })
+          counter++
+        }
+      }
+      // Finale
+      const semiMatches = matches.filter((m:any) => m.fase === 'semifinale')
+      if (semiMatches.length >= 2) {
+        matches.push({ id:`m${counter}`, label:`Match ${counter}`, fase:'finale',
+          casa:{tipo:'match',matchId:semiMatches[0].id,esito:'vincente'},
+          ospite:{tipo:'match',matchId:semiMatches[1].id,esito:'vincente'} })
+        counter++
+        if (torneo.finale_terzo_posto) {
+          matches.push({ id:`m${counter}`, label:`Match ${counter}`, fase:'terzo_posto',
+            casa:{tipo:'match',matchId:semiMatches[0].id,esito:'perdente'},
+            ospite:{tipo:'match',matchId:semiMatches[1].id,esito:'perdente'} })
+        }
+      } else if (semiMatches.length === 0 && matches.length >= 2) {
+        // Solo finale senza semifinali
+        matches.push({ id:`m${counter}`, label:`Match ${counter}`, fase:'finale',
+          casa:{tipo:'match',matchId:matches[0].id,esito:'vincente'},
+          ospite:{tipo:'match',matchId:matches[1].id,esito:'vincente'} })
+      }
+      return matches
+    }
+
+    const schema: any[] = schemaRaw
+      ? (typeof schemaRaw === 'string' ? JSON.parse(schemaRaw) : schemaRaw)
+      : buildSchemaDefault()
     const ordFasi = ['ottavi','quarti','semifinale','finale','terzo_posto']
 
     // Trova la fase corrente (ultima con partite generate)

@@ -68,12 +68,6 @@ export default function FaseFinaleTab({ torneo, squadre, gironi, partite, campi,
   return (
     <div className="space-y-4">
       {msg && <div className={`px-4 py-2 rounded-lg text-sm ${msgType==='err' ? 'bg-red-50 text-red-700' : 'bg-green-50 text-green-700'}`}>{msg}</div>}
-      <div className="flex gap-3">
-        <button onClick={generaAuto} disabled={generando}
-          className="px-4 py-2 bg-green-600 text-white rounded-lg text-sm font-medium hover:bg-green-700 disabled:opacity-50">
-          {generando ? 'Generando...' : '⚡ Genera dagli schemi configurati'}
-        </button>
-      </div>
       {fasi.filter(f => f.show).map(({ key, label }) => {
         const pf = partiteElim.filter(p => p.fase === key)
         return (
